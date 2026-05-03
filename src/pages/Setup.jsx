@@ -1,7 +1,28 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ALL_CATEGORIES } from '../data/words.js'
+import { getCategoryNames } from '../data/words.js'
 import { generateGame } from '../utils/game.js'
+
+const T = {
+  en: {
+    tagline: 'Find the spy among you',
+    players: 'Players',
+    impostors: 'Impostors',
+    category: 'Category',
+    all: 'All',
+    summary: (i, p) => `${i} impostor${i > 1 ? 's' : ''} among ${p} players`,
+    start: 'START GAME',
+  },
+  es: {
+    tagline: 'Encuentra al espía entre ustedes',
+    players: 'Jugadores',
+    impostors: 'Impostores',
+    category: 'Categoría',
+    all: 'Todas',
+    summary: (i, p) => `${i} impostor${i > 1 ? 'es' : ''} entre ${p} jugadores`,
+    start: 'INICIAR JUEGO',
+  },
+}
 
 function Stepper({ label, value, onChange, min, max }) {
   return (
@@ -30,57 +51,68 @@ function Stepper({ label, value, onChange, min, max }) {
 
 export default function Setup() {
   const navigate = useNavigate()
+  const [lang, setLang] = useState('en')
   const [numPlayers, setNumPlayers] = useState(6)
   const [numImpostors, setNumImpostors] = useState(1)
-  const [category, setCategory] = useState('All')
+  const [category, setCategory] = useState(T.en.all)
+
+  const t = T[lang]
+  const categoryNames = getCategoryNames(lang)
+
+  function handleLangChange(newLang) {
+    setLang(newLang)
+    setCategory(T[newLang].all)
+  }
 
   function handlePlayersChange(val) {
     setNumPlayers(val)
     if (numImpostors >= val) setNumImpostors(Math.max(1, val - 1))
   }
 
-  function handleImpostorsChange(val) {
-    setNumImpostors(val)
-  }
-
   function startGame() {
-    const game = generateGame(numPlayers, numImpostors, category)
-    navigate('/host', { state: { game, numPlayers, numImpostors } })
+    const game = generateGame(numPlayers, numImpostors, category, lang)
+    navigate('/host', { state: { game, numPlayers, numImpostors, lang } })
   }
 
   return (
     <div className="min-h-screen bg-[#0a0a18] flex flex-col items-center justify-center px-5 py-10">
       {/* Title */}
-      <div className="mb-10 text-center">
+      <div className="mb-8 text-center">
         <div className="text-6xl mb-3">🕵️</div>
         <h1 className="text-5xl font-black text-white tracking-tight">
           IMPOS<span className="text-red-500">TOR</span>
         </h1>
-        <p className="text-white/40 mt-2 text-sm tracking-widest uppercase">Find the spy among you</p>
+        <p className="text-white/40 mt-2 text-sm tracking-widest uppercase">{t.tagline}</p>
+      </div>
+
+      {/* Language toggle */}
+      <div className="flex gap-2 mb-6 bg-white/5 border border-white/10 rounded-2xl p-1.5">
+        {['en', 'es'].map((l) => (
+          <button
+            key={l}
+            onClick={() => handleLangChange(l)}
+            className={`flex items-center gap-2 px-5 py-2 rounded-xl font-bold text-sm transition-colors ${
+              lang === l
+                ? 'bg-indigo-500 text-white'
+                : 'text-white/40 active:text-white/60'
+            }`}
+          >
+            <span>{l === 'en' ? '🇺🇸' : '🇲🇽'}</span>
+            <span>{l === 'en' ? 'English' : 'Español'}</span>
+          </button>
+        ))}
       </div>
 
       {/* Config */}
       <div className="w-full max-w-sm flex flex-col gap-3">
-        <Stepper
-          label="Players"
-          value={numPlayers}
-          onChange={handlePlayersChange}
-          min={3}
-          max={20}
-        />
-        <Stepper
-          label="Impostors"
-          value={numImpostors}
-          onChange={handleImpostorsChange}
-          min={1}
-          max={Math.floor(numPlayers / 2)}
-        />
+        <Stepper label={t.players} value={numPlayers} onChange={handlePlayersChange} min={3} max={20} />
+        <Stepper label={t.impostors} value={numImpostors} onChange={(v) => setNumImpostors(v)} min={1} max={Math.floor(numPlayers / 2)} />
 
         {/* Category */}
         <div className="bg-white/5 rounded-2xl px-5 py-4 border border-white/10">
-          <label className="text-white font-semibold text-lg block mb-3">Category</label>
+          <label className="text-white font-semibold text-lg block mb-3">{t.category}</label>
           <div className="flex flex-wrap gap-2">
-            {['All', ...ALL_CATEGORIES].map((cat) => (
+            {[t.all, ...categoryNames].map((cat) => (
               <button
                 key={cat}
                 onClick={() => setCategory(cat)}
@@ -96,17 +128,15 @@ export default function Setup() {
           </div>
         </div>
 
-        {/* Summary */}
         <p className="text-center text-white/40 text-sm mt-1">
-          {numImpostors} impostor{numImpostors > 1 ? 's' : ''} among {numPlayers} players
+          {t.summary(numImpostors, numPlayers)}
         </p>
 
-        {/* Start */}
         <button
           onClick={startGame}
           className="mt-2 w-full bg-red-500 active:bg-red-600 text-white font-black text-xl py-5 rounded-2xl tracking-wide transition-colors shadow-lg shadow-red-500/30"
         >
-          START GAME
+          {t.start}
         </button>
       </div>
     </div>
