@@ -8,6 +8,10 @@ import WerewolfSetup from './pages/WerewolfSetup.jsx'
 import WerewolfLobby from './pages/werewolf/WerewolfLobby.jsx'
 import WerewolfModerator from './pages/werewolf/WerewolfModerator.jsx'
 import WerewolfPlayer from './pages/werewolf/WerewolfPlayer.jsx'
+import PeticionesSetup from './pages/peticiones/PeticionesSetup.jsx'
+import PeticionesHost from './pages/peticiones/PeticionesHost.jsx'
+import PeticionesLobby from './pages/peticiones/PeticionesLobby.jsx'
+import PeticionesPlayer from './pages/peticiones/PeticionesPlayer.jsx'
 
 export default function App() {
   return (
@@ -22,6 +26,10 @@ export default function App() {
         <Route path="/werewolf/lobby/:sessionId" element={<WerewolfLobby />} />
         <Route path="/werewolf/moderator/:sessionId" element={<WerewolfModerator />} />
         <Route path="/werewolf/play/:sessionId" element={<WerewolfPlayer />} />
+        <Route path="/peticiones" element={<PeticionesSetup />} />
+        <Route path="/peticiones/host/:sessionId" element={<PeticionesHost />} />
+        <Route path="/peticiones/lobby/:sessionId" element={<PeticionesLobby />} />
+        <Route path="/peticiones/play/:sessionId" element={<PeticionesPlayer />} />
       </Routes>
     </HashRouter>
   )

@@ -20,6 +20,13 @@ export default function Home() {
       >
         🐺 Werewolf
       </button>
+
+      <button
+        onClick={() => navigate('/peticiones')}
+        className="w-full max-w-xs py-6 rounded-2xl bg-gradient-to-br from-blue-700 to-blue-950 border border-blue-500 text-white text-2xl font-bold tracking-wide shadow-lg active:scale-95 transition-transform"
+      >
+        🙏 Peticiones
+      </button>
     </div>
   )
 }

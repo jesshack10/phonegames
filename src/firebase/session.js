@@ -254,3 +254,70 @@ export async function assignImpostorRoles(sessionId, playerIds, numImpostors, wo
   updates[`sessions/${sessionId}/meta/phase`] = 'role_reveal'
   await update(ref(db), updates)
 }
+
+// ─── PETICIONES ───────────────────────────────────────────────────────────────
+
+export async function createPeticionesSession(hostId) {
+  let sessionId, attempts = 0
+  while (attempts < 10) {
+    sessionId = generateSessionId()
+    const metaRef = ref(db, `sessions/${sessionId}/meta`)
+    let taken = false
+    await runTransaction(metaRef, (existing) => {
+      if (existing !== null) { taken = true; return existing }
+      return {
+        createdAt: Date.now(),
+        hostId,
+        phase: 'active',
+      }
+    })
+    if (!taken) break
+    attempts++
+  }
+  return sessionId
+}
+
+export async function joinPeticionesPlayer(sessionId, uid, name) {
+  const playerRef = ref(db, `sessions/${sessionId}/players/${uid}`)
+  await set(playerRef, { name, joinedAt: Date.now(), submitted: false })
+}
+
+export function subscribePeticionesSession(sessionId, cb) {
+  const r = ref(db, `sessions/${sessionId}/meta`)
+  onValue(r, snap => cb(snap.val()))
+  return () => off(r)
+}
+
+export function subscribePeticionesPlayers(sessionId, cb) {
+  const r = ref(db, `sessions/${sessionId}/players`)
+  onValue(r, snap => {
+    const val = snap.val() || {}
+    cb(Object.entries(val).map(([id, data]) => ({ id, ...data })))
+  })
+  return () => off(r)
+}
+
+export function subscribePeticiones(sessionId, cb) {
+  const r = ref(db, `sessions/${sessionId}/petitions`)
+  onValue(r, snap => {
+    const val = snap.val() || {}
+    cb(
+      Object.entries(val)
+        .map(([id, data]) => ({ id, ...data }))
+        .sort((a, b) => a.submittedAt - b.submittedAt)
+    )
+  })
+  return () => off(r)
+}
+
+export async function submitPeticion(sessionId, uid, name, text) {
+  const updates = {}
+  updates[`sessions/${sessionId}/petitions/${uid}`] = { name, text, submittedAt: Date.now() }
+  updates[`sessions/${sessionId}/players/${uid}/submitted`] = true
+  await update(ref(db), updates)
+}
+
+export async function getPeticionesMeta(sessionId) {
+  const snap = await get(ref(db, `sessions/${sessionId}/meta`))
+  return snap.val()
+}
