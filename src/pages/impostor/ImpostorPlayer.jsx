@@ -70,7 +70,7 @@ export default function ImpostorPlayer() {
 
   useEffect(() => {
     if (!meta) return
-    if (Date.now() - meta.createdAt > SESSION_TTL) {
+    if (meta.phase === 'ended' || Date.now() - meta.createdAt > SESSION_TTL) {
       deleteSession(sessionId).then(() => navigate('/', { replace: true }))
     }
   }, [meta, sessionId, navigate])

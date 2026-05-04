@@ -15,7 +15,12 @@ import {
 export const SESSION_TTL = 60 * 60 * 1000 // 1 hour in ms
 
 export async function deleteSession(sessionId) {
-  await remove(ref(db, `sessions/${sessionId}`))
+  try {
+    await remove(ref(db, `sessions/${sessionId}`))
+  } catch {
+    // Fallback if rules don't allow root deletion: mark as ended so all clients redirect home
+    await update(ref(db, `sessions/${sessionId}/meta`), { phase: 'ended' })
+  }
 }
 import { generateSessionId } from '../utils/generateId.js'
 

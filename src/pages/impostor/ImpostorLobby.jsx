@@ -78,7 +78,7 @@ export default function ImpostorLobby() {
   // Navigate when host assigns roles or session expired
   useEffect(() => {
     if (!meta) return
-    if (Date.now() - meta.createdAt > SESSION_TTL) {
+    if (meta.phase === 'ended' || Date.now() - meta.createdAt > SESSION_TTL) {
       deleteSession(sessionId).then(() => navigate('/', { replace: true }))
       return
     }
