@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   subscribeSession, subscribePlayers, subscribeNightActions,
-  submitNightAction, submitVote,
+  submitNightAction, submitVote, deleteSession, SESSION_TTL,
 } from '../../firebase/session.js'
 import { ROLE_CONFIG } from '../../utils/werewolf.js'
 import { useAuth } from '../../hooks/useAuth.js'
@@ -45,6 +45,13 @@ export default function WerewolfPlayer() {
     const unsub = subscribeNightActions(sessionId, meta.round, setNightActions)
     return unsub
   }, [sessionId, meta?.round])
+
+  useEffect(() => {
+    if (!meta?.createdAt) return
+    if (Date.now() - meta.createdAt > SESSION_TTL) {
+      deleteSession(sessionId).then(() => navigate('/', { replace: true }))
+    }
+  }, [meta, sessionId, navigate])
 
   const myPlayer = players.find(p => p.id === uid)
   const myRole = myPlayer?.role

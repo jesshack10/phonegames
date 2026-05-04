@@ -5,7 +5,8 @@ import {
   subscribeSession, subscribePlayers, subscribeNightActions, subscribeVotes,
   assignRolesToPlayers, startGame, beginNight, advanceNightTurn,
   startDayPhase, startDiscussion, startVoting, confirmElimination,
-  endGame, nextRound, appendActionLog, setSeerResult,
+  endGame, nextRound, appendActionLog, setSeerResult, deleteSession,
+  SESSION_TTL,
 } from '../../firebase/session.js'
 import {
   assignRoles, checkWinCondition, resolveNight, getNextNightTurn,
@@ -34,6 +35,13 @@ export default function WerewolfModerator() {
     ]
     return () => unsubs.forEach(u => u())
   }, [sessionId])
+
+  useEffect(() => {
+    if (!meta?.createdAt) return
+    if (Date.now() - meta.createdAt > SESSION_TTL) {
+      deleteSession(sessionId).then(() => navigate('/', { replace: true }))
+    }
+  }, [meta, sessionId, navigate])
 
   useEffect(() => {
     if (!meta?.round) return
@@ -183,7 +191,10 @@ export default function WerewolfModerator() {
         </div>
         <ActionLog log={actionLog} />
         <button
-          onClick={() => navigate('/werewolf/setup')}
+          onClick={async () => {
+            await deleteSession(sessionId)
+            navigate('/werewolf/setup', { replace: true })
+          }}
           className="w-full max-w-xs py-4 rounded-2xl bg-red-700 border border-red-500 text-white text-lg font-bold active:scale-95 transition-transform"
         >
           New Game
