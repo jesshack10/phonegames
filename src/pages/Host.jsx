@@ -11,7 +11,7 @@ const T = {
     dontShow: "Don't show your screen to others",
     hint: 'Scan with your phone camera • Opens a webpage showing your role',
     nextBtn: (n) => `Player ${n} done → Next`,
-    allScannedBtn: 'All scanned → Reveal my role',
+    lastNextBtn: (n) => `Player ${n} done → Reveal my role`,
     startOver: '← Start over',
     hostTurnTitle: 'Your turn!',
     hostTurnBody: 'All other players have scanned. Tap to reveal your role privately.',
@@ -36,7 +36,7 @@ const T = {
     dontShow: 'No muestres tu pantalla a los demás',
     hint: 'Escanea con la cámara de tu teléfono • Abre una página con tu rol',
     nextBtn: (n) => `Jugador ${n} listo → Siguiente`,
-    allScannedBtn: 'Todos escanearon → Revelar mi rol',
+    lastNextBtn: (n) => `Jugador ${n} listo → Revelar mi rol`,
     startOver: '← Volver al inicio',
     hostTurnTitle: '¡Tu turno!',
     hostTurnBody: 'Los demás jugadores ya escanearon. Toca para revelar tu rol en privado.',
@@ -210,7 +210,7 @@ export default function Host() {
         onClick={handleNext}
         className="w-full max-w-sm bg-red-500 active:bg-red-600 text-white font-black text-xl py-5 rounded-2xl tracking-wide transition-colors shadow-lg shadow-red-500/20"
       >
-        {isLastQrPlayer ? t.allScannedBtn : t.nextBtn(currentIndex + 1)}
+        {isLastQrPlayer ? t.lastNextBtn(currentIndex + 1) : t.nextBtn(currentIndex + 1)}
       </button>
 
       <button
