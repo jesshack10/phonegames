@@ -5,11 +5,18 @@ import {
   get,
   push,
   update,
+  remove,
   onValue,
   runTransaction,
   serverTimestamp,
   off,
 } from 'firebase/database'
+
+export const SESSION_TTL = 60 * 60 * 1000 // 1 hour in ms
+
+export async function deleteSession(sessionId) {
+  await remove(ref(db, `sessions/${sessionId}`))
+}
 import { generateSessionId } from '../utils/generateId.js'
 
 export async function createSession(hostId, roleConfig) {

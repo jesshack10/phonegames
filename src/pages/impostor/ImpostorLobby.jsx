@@ -5,6 +5,8 @@ import {
   subscribeImpostorSession,
   subscribeImpostorPlayers,
   getImpostorMeta,
+  deleteSession,
+  SESSION_TTL,
 } from '../../firebase/session.js'
 import { useAuth } from '../../hooks/useAuth.js'
 
@@ -73,9 +75,14 @@ export default function ImpostorLobby() {
     return () => { u1(); u2() }
   }, [joined, sessionId])
 
-  // Navigate when host assigns roles
+  // Navigate when host assigns roles or session expired
   useEffect(() => {
-    if (meta?.phase === 'role_reveal') navigate(`/impostor/play/${sessionId}`, { replace: true })
+    if (!meta) return
+    if (Date.now() - meta.createdAt > SESSION_TTL) {
+      deleteSession(sessionId).then(() => navigate('/', { replace: true }))
+      return
+    }
+    if (meta.phase === 'role_reveal') navigate(`/impostor/play/${sessionId}`, { replace: true })
   }, [meta, navigate, sessionId])
 
   const t = T[lang]
@@ -88,6 +95,10 @@ export default function ImpostorLobby() {
     try {
       const m = await getImpostorMeta(sessionId)
       if (!m) return setError(t.errNotFound)
+      if (Date.now() - m.createdAt > SESSION_TTL) {
+        await deleteSession(sessionId)
+        return setError(t.errNotFound)
+      }
       if (m.phase !== 'lobby') return setError(t.errStarted)
       await joinImpostorPlayer(sessionId, uid, trimmed, false)
       localStorage.setItem(storageKey, JSON.stringify({ uid, name: trimmed }))

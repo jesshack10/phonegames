@@ -5,6 +5,8 @@ import {
   subscribeImpostorSession,
   subscribeImpostorPlayers,
   assignImpostorRoles,
+  deleteSession,
+  SESSION_TTL,
 } from '../../firebase/session.js'
 import { getRandomWord } from '../../data/words.js'
 import { useAuth } from '../../hooks/useAuth.js'
@@ -47,7 +49,12 @@ export default function ImpostorHost() {
   }, [sessionId])
 
   useEffect(() => {
-    if (meta?.phase === 'role_reveal') navigate(`/impostor/play/${sessionId}`, { replace: true })
+    if (!meta) return
+    if (Date.now() - meta.createdAt > SESSION_TTL) {
+      deleteSession(sessionId).then(() => navigate('/', { replace: true }))
+      return
+    }
+    if (meta.phase === 'role_reveal') navigate(`/impostor/play/${sessionId}`, { replace: true })
   }, [meta, navigate, sessionId])
 
   const lang = meta?.lang ?? 'es'

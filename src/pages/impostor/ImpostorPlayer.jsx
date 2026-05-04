@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useParams } from 'react-router-dom'
-import { subscribeImpostorSession, subscribeImpostorPlayers } from '../../firebase/session.js'
+import { useParams, useNavigate } from 'react-router-dom'
+import { subscribeImpostorSession, subscribeImpostorPlayers, deleteSession, SESSION_TTL } from '../../firebase/session.js'
 import { useAuth } from '../../hooks/useAuth.js'
 
 const T = {
@@ -60,10 +60,18 @@ const T = {
 
 export default function ImpostorPlayer() {
   const { sessionId } = useParams()
+  const navigate = useNavigate()
   const { uid } = useAuth()
   const [meta, setMeta] = useState(null)
   const [players, setPlayers] = useState([])
   const [revealed, setRevealed] = useState(false)
+
+  useEffect(() => {
+    if (!meta) return
+    if (Date.now() - meta.createdAt > SESSION_TTL) {
+      deleteSession(sessionId).then(() => navigate('/', { replace: true }))
+    }
+  }, [meta, sessionId, navigate])
 
   useEffect(() => {
     const u1 = subscribeImpostorSession(sessionId, setMeta)
