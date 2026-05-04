@@ -38,7 +38,7 @@ const T = {
     makePrivate: 'Asegúrate de que nadie más pueda ver tu pantalla',
     game: (t, n) => `${t} jugadores · ${n} impostor${n > 1 ? 'es' : ''}`,
     yourRole: 'Tu rol',
-    crewmate: 'TRIPULANTE',
+    crewmate: 'JUGADOR',
     secretWord: 'Palabra secreta',
     crewmateNote: (n) => `Todos excepto el impostor${n > 1 ? 'es' : ''} tienen esta palabra.`,
     crewmateMission: 'Tu misión',
@@ -52,7 +52,7 @@ const T = {
     impostorNote: 'No conoces la palabra secreta. ¡Pasa desapercibido y no te descubran!',
     impostorMission: 'Tu misión',
     impostorTips: [
-      'Escucha con atención las pistas de los tripulantes',
+      'Escucha con atención las pistas de los jugadores',
       'Da respuestas vagas para pasar desapercibido',
       'Intenta adivinar la palabra secreta',
       'Evita ser eliminado por votación',
@@ -154,11 +154,11 @@ export default function Reveal() {
         <p className="text-green-300 text-sm font-semibold uppercase tracking-widest mb-3">
           {t.yourRole}
         </p>
-        <div className="bg-white/10 rounded-2xl px-6 py-5 mb-4">
+        <p className="text-xl font-black text-green-400 mb-4">{t.crewmate}</p>
+        <div className="bg-white/10 rounded-2xl px-6 py-5 mb-3">
           <p className="text-white/50 text-xs uppercase tracking-widest mb-2">{t.secretWord}</p>
           <p className="text-white text-5xl font-black capitalize">{data.word}</p>
         </div>
-        <p className="text-xl font-black text-green-400 mb-1">{t.crewmate}</p>
         <p className="text-green-300/60 text-sm mt-1">
           {t.crewmateNote(data.numImpostors)}
         </p>

@@ -42,7 +42,7 @@ const T = {
     hostTurnBody: 'Los demás jugadores ya escanearon. Toca para revelar tu rol en privado.',
     hostRevealBtn: 'Toca para revelar tu rol',
     yourRole: 'Tu rol',
-    crewmate: 'TRIPULANTE',
+    crewmate: 'JUGADOR',
     impostor: 'IMPOSTOR',
     secretWord: 'Palabra secreta',
     crewmateNote: (n) => `Todos excepto el impostor${n > 1 ? 'es' : ''} tienen esta palabra.`,
@@ -50,7 +50,7 @@ const T = {
     readyTitle: '¡Todos los jugadores listos!',
     readyAction: (n) => `¡Empiecen a discutir y encuentren al impostor${n > 1 ? 'es' : ''}!`,
     howToPlay: 'Cómo jugar',
-    howToPlayText: 'Los tripulantes dan pistas sobre la palabra secreta sin decirla. Los impostores intentan pasar desapercibidos. ¡Voten para eliminar a quien crean que es el impostor!',
+    howToPlayText: 'Los jugadores dan pistas sobre la palabra secreta sin decirla. Los impostores intentan pasar desapercibidos. ¡Voten para eliminar a quien crean que es el impostor!',
     startGameBtn: '¡Comenzar el juego!',
     newGame: 'Nueva partida',
   },
@@ -132,11 +132,11 @@ export default function Host() {
             <h1 className="text-4xl font-black mb-3 text-red-400">{t.impostor}</h1>
           ) : (
             <>
+              <h1 className="text-xl font-black mb-4 text-green-400">{t.crewmate}</h1>
               <div className="bg-white/10 rounded-2xl px-6 py-5 mb-3">
                 <p className="text-white/50 text-xs uppercase tracking-widest mb-2">{t.secretWord}</p>
                 <p className="text-white text-5xl font-black capitalize">{word}</p>
               </div>
-              <h1 className="text-xl font-black mb-1 text-green-400">{t.crewmate}</h1>
             </>
           )}
 
