@@ -1,0 +1,181 @@
+import { db } from './config.js'
+import {
+  ref,
+  set,
+  get,
+  push,
+  update,
+  onValue,
+  runTransaction,
+  serverTimestamp,
+  off,
+} from 'firebase/database'
+import { generateSessionId } from '../utils/generateId.js'
+
+export async function createSession(hostId, roleConfig) {
+  let sessionId
+  let attempts = 0
+  while (attempts < 10) {
+    sessionId = generateSessionId()
+    const metaRef = ref(db, `sessions/${sessionId}/meta`)
+    let taken = false
+    await runTransaction(metaRef, (existing) => {
+      if (existing !== null) {
+        taken = true
+        return existing
+      }
+      return {
+        createdAt: Date.now(),
+        hostId,
+        phase: 'lobby',
+        nightTurn: null,
+        round: 1,
+        winner: null,
+        roleConfig,
+      }
+    })
+    if (!taken) break
+    attempts++
+  }
+  return sessionId
+}
+
+export async function joinSession(sessionId, uid, name, avatar) {
+  const playerRef = ref(db, `sessions/${sessionId}/players/${uid}`)
+  await set(playerRef, {
+    name,
+    avatar,
+    joinedAt: Date.now(),
+    alive: true,
+    role: null,
+    isHost: false,
+  })
+  return uid
+}
+
+export async function setHostPlayer(sessionId, uid) {
+  const playerRef = ref(db, `sessions/${sessionId}/players/${uid}`)
+  await set(playerRef, {
+    name: 'Moderator',
+    avatar: 'GrayOwl',
+    joinedAt: Date.now(),
+    alive: false,
+    role: 'moderator',
+    isHost: true,
+  })
+}
+
+export function subscribeSession(sessionId, callback) {
+  const metaRef = ref(db, `sessions/${sessionId}/meta`)
+  onValue(metaRef, (snap) => callback(snap.val()))
+  return () => off(metaRef)
+}
+
+export function subscribePlayers(sessionId, callback) {
+  const playersRef = ref(db, `sessions/${sessionId}/players`)
+  onValue(playersRef, (snap) => {
+    const val = snap.val() || {}
+    callback(
+      Object.entries(val).map(([id, data]) => ({ id, ...data }))
+    )
+  })
+  return () => off(playersRef)
+}
+
+export function subscribeNightActions(sessionId, round, callback) {
+  const actionsRef = ref(db, `sessions/${sessionId}/nightActions/${round}`)
+  onValue(actionsRef, (snap) => callback(snap.val() || {}))
+  return () => off(actionsRef)
+}
+
+export function subscribeVotes(sessionId, round, callback) {
+  const votesRef = ref(db, `sessions/${sessionId}/votes/${round}`)
+  onValue(votesRef, (snap) => callback(snap.val() || {}))
+  return () => off(votesRef)
+}
+
+export async function assignRolesToPlayers(sessionId, assignments) {
+  const updates = {}
+  for (const { playerId, role } of assignments) {
+    updates[`sessions/${sessionId}/players/${playerId}/role`] = role
+  }
+  await update(ref(db), updates)
+}
+
+export async function submitNightAction(sessionId, round, actionType, targetId) {
+  const actionRef = ref(db, `sessions/${sessionId}/nightActions/${round}/${actionType}`)
+  await runTransaction(actionRef, (existing) => {
+    if (existing !== null) return existing
+    return targetId
+  })
+}
+
+export async function submitVote(sessionId, round, voterId, targetId) {
+  const voteRef = ref(db, `sessions/${sessionId}/votes/${round}/${voterId}`)
+  await runTransaction(voteRef, (existing) => {
+    if (existing !== null) return existing
+    return targetId
+  })
+}
+
+export async function updateMeta(sessionId, updates) {
+  const metaRef = ref(db, `sessions/${sessionId}/meta`)
+  await update(metaRef, updates)
+}
+
+export async function advanceNightTurn(sessionId, nextTurn) {
+  await updateMeta(sessionId, { nightTurn: nextTurn })
+}
+
+export async function startGame(sessionId) {
+  await updateMeta(sessionId, { phase: 'role_reveal' })
+}
+
+export async function beginNight(sessionId, round) {
+  await updateMeta(sessionId, { phase: 'night', nightTurn: 'werewolves', round })
+}
+
+export async function startDayPhase(sessionId, killedPlayerId) {
+  const updates = { phase: 'day_announce' }
+  if (killedPlayerId) {
+    await update(ref(db, `sessions/${sessionId}/players/${killedPlayerId}`), { alive: false })
+  }
+  await updateMeta(sessionId, updates)
+}
+
+export async function startDiscussion(sessionId) {
+  await updateMeta(sessionId, { phase: 'day_discuss' })
+}
+
+export async function startVoting(sessionId) {
+  await updateMeta(sessionId, { phase: 'voting' })
+}
+
+export async function confirmElimination(sessionId, eliminatedId) {
+  if (eliminatedId) {
+    await update(ref(db, `sessions/${sessionId}/players/${eliminatedId}`), { alive: false })
+  }
+  await updateMeta(sessionId, { phase: 'day_elimination' })
+}
+
+export async function endGame(sessionId, winner) {
+  await updateMeta(sessionId, { phase: 'ended', winner })
+}
+
+export async function nextRound(sessionId, round) {
+  await updateMeta(sessionId, { phase: 'night', nightTurn: 'werewolves', round })
+}
+
+export async function appendActionLog(sessionId, round, entry) {
+  const logRef = ref(db, `sessions/${sessionId}/actionLog/${round}`)
+  await push(logRef, { ...entry, time: Date.now() })
+}
+
+export async function setSeerResult(sessionId, round, isWerewolf) {
+  await set(ref(db, `sessions/${sessionId}/nightActions/${round}/seerResult`), isWerewolf)
+}
+
+export async function getSessionMeta(sessionId) {
+  const snap = await get(ref(db, `sessions/${sessionId}/meta`))
+  return snap.val()
+}
