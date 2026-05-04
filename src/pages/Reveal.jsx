@@ -154,12 +154,12 @@ export default function Reveal() {
         <p className="text-green-300 text-sm font-semibold uppercase tracking-widest mb-3">
           {t.yourRole}
         </p>
-        <h1 className="text-4xl font-black text-green-400 mb-4">{t.crewmate}</h1>
-        <div className="bg-white/10 rounded-2xl px-6 py-4">
-          <p className="text-white/50 text-xs uppercase tracking-widest mb-1">{t.secretWord}</p>
-          <p className="text-white text-3xl font-black capitalize">{data.word}</p>
+        <div className="bg-white/10 rounded-2xl px-6 py-5 mb-4">
+          <p className="text-white/50 text-xs uppercase tracking-widest mb-2">{t.secretWord}</p>
+          <p className="text-white text-5xl font-black capitalize">{data.word}</p>
         </div>
-        <p className="text-green-300/60 text-sm mt-4">
+        <p className="text-xl font-black text-green-400 mb-1">{t.crewmate}</p>
+        <p className="text-green-300/60 text-sm mt-1">
           {t.crewmateNote(data.numImpostors)}
         </p>
       </div>

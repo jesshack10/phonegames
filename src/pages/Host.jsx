@@ -128,15 +128,16 @@ export default function Host() {
           <p className={`text-sm font-semibold uppercase tracking-widest mb-3 ${isHostImpostor ? 'text-red-300' : 'text-green-300'}`}>
             {t.yourRole}
           </p>
-          <h1 className={`text-4xl font-black mb-3 ${isHostImpostor ? 'text-red-400' : 'text-green-400'}`}>
-            {isHostImpostor ? t.impostor : t.crewmate}
-          </h1>
-
-          {!isHostImpostor && (
-            <div className="bg-white/10 rounded-2xl px-6 py-4 mt-2">
-              <p className="text-white/50 text-xs uppercase tracking-widest mb-1">{t.secretWord}</p>
-              <p className="text-white text-3xl font-black capitalize">{word}</p>
-            </div>
+          {isHostImpostor ? (
+            <h1 className="text-4xl font-black mb-3 text-red-400">{t.impostor}</h1>
+          ) : (
+            <>
+              <div className="bg-white/10 rounded-2xl px-6 py-5 mb-3">
+                <p className="text-white/50 text-xs uppercase tracking-widest mb-2">{t.secretWord}</p>
+                <p className="text-white text-5xl font-black capitalize">{word}</p>
+              </div>
+              <h1 className="text-xl font-black mb-1 text-green-400">{t.crewmate}</h1>
+            </>
           )}
 
           <p className={`text-sm mt-4 ${isHostImpostor ? 'text-red-300/60' : 'text-green-300/60'}`}>
