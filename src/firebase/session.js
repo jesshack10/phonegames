@@ -179,3 +179,66 @@ export async function getSessionMeta(sessionId) {
   const snap = await get(ref(db, `sessions/${sessionId}/meta`))
   return snap.val()
 }
+
+// ─── IMPOSTOR GAME ────────────────────────────────────────────────────────────
+
+export async function createImpostorSession(hostId, config) {
+  let sessionId, attempts = 0
+  while (attempts < 10) {
+    sessionId = generateSessionId()
+    const metaRef = ref(db, `impostorSessions/${sessionId}/meta`)
+    let taken = false
+    await runTransaction(metaRef, (existing) => {
+      if (existing !== null) { taken = true; return existing }
+      return {
+        createdAt: Date.now(),
+        hostId,
+        phase: 'lobby',
+        numImpostors: config.numImpostors,
+        category: config.category,
+        lang: config.lang,
+        word: null,
+      }
+    })
+    if (!taken) break
+    attempts++
+  }
+  return sessionId
+}
+
+export async function joinImpostorPlayer(sessionId, uid, name, isHost = false) {
+  const playerRef = ref(db, `impostorSessions/${sessionId}/players/${uid}`)
+  await set(playerRef, { name, joinedAt: Date.now(), role: null, isHost })
+}
+
+export function subscribeImpostorSession(sessionId, cb) {
+  const r = ref(db, `impostorSessions/${sessionId}/meta`)
+  onValue(r, snap => cb(snap.val()))
+  return () => off(r)
+}
+
+export function subscribeImpostorPlayers(sessionId, cb) {
+  const r = ref(db, `impostorSessions/${sessionId}/players`)
+  onValue(r, snap => {
+    const val = snap.val() || {}
+    cb(Object.entries(val).map(([id, data]) => ({ id, ...data })))
+  })
+  return () => off(r)
+}
+
+export async function getImpostorMeta(sessionId) {
+  const snap = await get(ref(db, `impostorSessions/${sessionId}/meta`))
+  return snap.val()
+}
+
+export async function assignImpostorRoles(sessionId, playerIds, numImpostors, word) {
+  const shuffled = [...playerIds].sort(() => Math.random() - 0.5)
+  const impostorSet = new Set(shuffled.slice(0, numImpostors))
+  const updates = {}
+  for (const id of playerIds) {
+    updates[`impostorSessions/${sessionId}/players/${id}/role`] = impostorSet.has(id) ? 'impostor' : 'crewmate'
+  }
+  updates[`impostorSessions/${sessionId}/meta/word`] = word
+  updates[`impostorSessions/${sessionId}/meta/phase`] = 'role_reveal'
+  await update(ref(db), updates)
+}
