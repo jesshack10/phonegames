@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import {
@@ -41,6 +41,7 @@ export default function ImpostorHost() {
   const [meta, setMeta] = useState(null)
   const [players, setPlayers] = useState([])
   const [loading, setLoading] = useState(false)
+  const sessionExistedRef = useRef(false)
 
   useEffect(() => {
     const u1 = subscribeImpostorSession(sessionId, setMeta)
@@ -49,12 +50,16 @@ export default function ImpostorHost() {
   }, [sessionId])
 
   useEffect(() => {
-    if (!meta) return
-    if (meta.phase === 'ended' || Date.now() - meta.createdAt > SESSION_TTL) {
-      deleteSession(sessionId).then(() => navigate('/', { replace: true }))
-      return
+    if (meta) {
+      sessionExistedRef.current = true
+      if (meta.phase === 'ended' || Date.now() - meta.createdAt > SESSION_TTL) {
+        deleteSession(sessionId).then(() => navigate('/', { replace: true }))
+        return
+      }
+      if (meta.phase === 'role_reveal') navigate(`/impostor/play/${sessionId}`, { replace: true })
+    } else if (sessionExistedRef.current) {
+      navigate('/', { replace: true })
     }
-    if (meta.phase === 'role_reveal') navigate(`/impostor/play/${sessionId}`, { replace: true })
   }, [meta, navigate, sessionId])
 
   const lang = meta?.lang ?? 'es'

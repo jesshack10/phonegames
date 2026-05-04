@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { subscribeImpostorSession, subscribeImpostorPlayers, deleteSession, SESSION_TTL } from '../../firebase/session.js'
 import { useAuth } from '../../hooks/useAuth.js'
@@ -67,13 +67,21 @@ export default function ImpostorPlayer() {
   const [meta, setMeta] = useState(null)
   const [players, setPlayers] = useState([])
   const [revealed, setRevealed] = useState(false)
+  const sessionExistedRef = useRef(false)
+
+  const storageKey = `imp_${sessionId}`
 
   useEffect(() => {
-    if (!meta) return
-    if (meta.phase === 'ended' || Date.now() - meta.createdAt > SESSION_TTL) {
-      deleteSession(sessionId).then(() => navigate('/', { replace: true }))
+    if (meta) {
+      sessionExistedRef.current = true
+      if (meta.phase === 'ended' || Date.now() - meta.createdAt > SESSION_TTL) {
+        deleteSession(sessionId).then(() => navigate('/', { replace: true }))
+      }
+    } else if (sessionExistedRef.current) {
+      localStorage.removeItem(storageKey)
+      navigate('/', { replace: true })
     }
-  }, [meta, sessionId, navigate])
+  }, [meta, sessionId, navigate, storageKey])
 
   useEffect(() => {
     const u1 = subscribeImpostorSession(sessionId, setMeta)

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   joinImpostorPlayer,
@@ -47,6 +47,7 @@ export default function ImpostorLobby() {
   const [players, setPlayers] = useState([])
   const [meta, setMeta] = useState(null)
   const [error, setError] = useState('')
+  const sessionExistedRef = useRef(false)
 
   const storageKey = `imp_${sessionId}`
 
@@ -75,15 +76,20 @@ export default function ImpostorLobby() {
     return () => { u1(); u2() }
   }, [joined, sessionId])
 
-  // Navigate when host assigns roles or session expired
+  // Navigate when host assigns roles, session expired, or session was deleted
   useEffect(() => {
-    if (!meta) return
-    if (meta.phase === 'ended' || Date.now() - meta.createdAt > SESSION_TTL) {
-      deleteSession(sessionId).then(() => navigate('/', { replace: true }))
-      return
+    if (meta) {
+      sessionExistedRef.current = true
+      if (meta.phase === 'ended' || Date.now() - meta.createdAt > SESSION_TTL) {
+        deleteSession(sessionId).then(() => navigate('/', { replace: true }))
+        return
+      }
+      if (meta.phase === 'role_reveal') navigate(`/impostor/play/${sessionId}`, { replace: true })
+    } else if (joined && sessionExistedRef.current) {
+      localStorage.removeItem(storageKey)
+      navigate('/', { replace: true })
     }
-    if (meta.phase === 'role_reveal') navigate(`/impostor/play/${sessionId}`, { replace: true })
-  }, [meta, navigate, sessionId])
+  }, [meta, navigate, sessionId, joined, storageKey])
 
   const t = T[lang]
 
