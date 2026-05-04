@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { auth } from '../../firebase/config.js'
 import {
   subscribeSession, subscribePlayers, subscribeNightActions,
   submitNightAction, submitVote,
 } from '../../firebase/session.js'
 import { ROLE_CONFIG } from '../../utils/werewolf.js'
+import { useAuth } from '../../hooks/useAuth.js'
 import RoleCard from '../../components/werewolf/RoleCard.jsx'
 import NightActionPanel from '../../components/werewolf/NightActionPanel.jsx'
 import VotePanel from '../../components/werewolf/VotePanel.jsx'
@@ -15,6 +15,7 @@ import PlayerList from '../../components/werewolf/PlayerList.jsx'
 export default function WerewolfPlayer() {
   const { sessionId } = useParams()
   const navigate = useNavigate()
+  const { uid } = useAuth()
 
   const [meta, setMeta] = useState(null)
   const [players, setPlayers] = useState([])
@@ -22,7 +23,6 @@ export default function WerewolfPlayer() {
   const [roleRevealed, setRoleRevealed] = useState(false)
 
   const storageKey = `ww_player_${sessionId}`
-  const uid = auth.currentUser?.uid
 
   // Reconnect if player refreshes
   useEffect(() => {

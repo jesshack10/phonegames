@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
-import { auth } from '../firebase/config.js'
 import { createSession, setHostPlayer } from '../firebase/session.js'
 import { suggestRoles } from '../utils/werewolf.js'
+import { useAuth } from '../hooks/useAuth.js'
 import RoleBalanceBadge from '../components/werewolf/RoleBalanceBadge.jsx'
 
 export default function WerewolfSetup() {
   const navigate = useNavigate()
+  const { uid, ready } = useAuth()
   const [playerCount, setPlayerCount] = useState(6)
   const [roleConfig, setRoleConfig] = useState(suggestRoles(6))
   const [sessionId, setSessionId] = useState(null)
@@ -31,11 +32,9 @@ export default function WerewolfSetup() {
   }
 
   async function handleCreate() {
-    if (!isValid) return
+    if (!isValid || !uid) return
     setLoading(true)
     try {
-      const uid = auth.currentUser?.uid
-      if (!uid) return
       const id = await createSession(uid, roleConfig)
       await setHostPlayer(id, uid)
       setSessionId(id)
@@ -141,10 +140,10 @@ export default function WerewolfSetup() {
 
       <button
         onClick={handleCreate}
-        disabled={!isValid || loading}
+        disabled={!isValid || loading || !ready || !uid}
         className="w-full py-4 rounded-2xl bg-red-700 border border-red-500 text-white text-lg font-bold disabled:opacity-40 active:scale-95 transition-transform mt-auto"
       >
-        {loading ? 'Creating...' : 'Create Session →'}
+        {!ready ? 'Connecting…' : loading ? 'Creating...' : !uid ? 'Firebase not configured' : 'Create Session →'}
       </button>
     </div>
   )

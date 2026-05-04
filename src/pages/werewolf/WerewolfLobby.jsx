@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { auth } from '../../firebase/config.js'
 import { joinSession, subscribeSession, subscribePlayers, getSessionMeta } from '../../firebase/session.js'
 import { generateAvatar } from '../../utils/werewolf.js'
+import { useAuth } from '../../hooks/useAuth.js'
 import Avatar from '../../components/werewolf/Avatar.jsx'
 
 export default function WerewolfLobby() {
   const { sessionId } = useParams()
   const navigate = useNavigate()
+  const { uid, ready } = useAuth()
   const [name, setName] = useState('')
   const [joined, setJoined] = useState(false)
   const [players, setPlayers] = useState([])
@@ -18,13 +19,13 @@ export default function WerewolfLobby() {
   const storageKey = `ww_player_${sessionId}`
 
   useEffect(() => {
+    if (!uid) return
     const stored = localStorage.getItem(storageKey)
     if (stored) {
       const { playerId } = JSON.parse(stored)
-      const uid = auth.currentUser?.uid
       if (uid === playerId) setJoined(true)
     }
-  }, [storageKey])
+  }, [uid, storageKey])
 
   useEffect(() => {
     if (!joined) return
@@ -46,8 +47,7 @@ export default function WerewolfLobby() {
     if (!trimmed || trimmed.length < 1) return setError('Enter your name')
     if (trimmed.length > 16) return setError('Name too long (max 16 chars)')
 
-    const uid = auth.currentUser?.uid
-    if (!uid) return setError('Not connected, please wait and retry')
+    if (!uid) return setError('Not connected — please wait and retry')
 
     try {
       const meta = await getSessionMeta(sessionId)
