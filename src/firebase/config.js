@@ -12,7 +12,19 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 }
 
-const app = initializeApp(firebaseConfig)
+let db = null
+let auth = null
 
-export const db = getDatabase(app)
-export const auth = getAuth(app)
+if (firebaseConfig.apiKey && firebaseConfig.databaseURL) {
+  try {
+    const app = initializeApp(firebaseConfig)
+    db = getDatabase(app)
+    auth = getAuth(app)
+  } catch (e) {
+    console.warn('Firebase failed to initialize:', e)
+  }
+} else {
+  console.warn('Firebase env vars missing — Werewolf game will not work')
+}
+
+export { db, auth }
