@@ -51,10 +51,10 @@ function Stepper({ label, value, onChange, min, max }) {
 
 export default function Setup() {
   const navigate = useNavigate()
-  const [lang, setLang] = useState('en')
+  const [lang, setLang] = useState('es')
   const [numPlayers, setNumPlayers] = useState(6)
   const [numImpostors, setNumImpostors] = useState(1)
-  const [category, setCategory] = useState(T.en.all)
+  const [category, setCategory] = useState(T.es.all)
 
   const t = T[lang]
   const categoryNames = getCategoryNames(lang)
