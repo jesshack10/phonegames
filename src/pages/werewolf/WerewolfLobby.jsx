@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { joinSession, subscribeSession, subscribePlayers, getSessionMeta } from '../../firebase/session.js'
 import { generateAvatar } from '../../utils/werewolf.js'
@@ -15,6 +15,7 @@ export default function WerewolfLobby() {
   const [meta, setMeta] = useState(null)
   const [error, setError] = useState('')
   const [myAvatar, setMyAvatar] = useState(() => generateAvatar())
+  const sessionExistedRef = useRef(false)
 
   const storageKey = `ww_player_${sessionId}`
 
@@ -35,12 +36,17 @@ export default function WerewolfLobby() {
   }, [joined, sessionId])
 
   useEffect(() => {
-    if (!meta) return
-    if (meta.phase === 'role_reveal' || meta.phase === 'night' || meta.phase === 'day_announce' ||
-        meta.phase === 'day_discuss' || meta.phase === 'voting' || meta.phase === 'day_elimination' || meta.phase === 'ended') {
-      navigate(`/werewolf/play/${sessionId}`)
+    if (meta) {
+      sessionExistedRef.current = true
+      if (meta.phase === 'role_reveal' || meta.phase === 'night' || meta.phase === 'day_announce' ||
+          meta.phase === 'day_discuss' || meta.phase === 'voting' || meta.phase === 'day_elimination' || meta.phase === 'ended') {
+        navigate(`/werewolf/play/${sessionId}`)
+      }
+    } else if (joined && sessionExistedRef.current) {
+      localStorage.removeItem(storageKey)
+      navigate('/', { replace: true })
     }
-  }, [meta, navigate, sessionId])
+  }, [meta, navigate, sessionId, joined, storageKey])
 
   async function handleJoin() {
     const trimmed = name.trim()

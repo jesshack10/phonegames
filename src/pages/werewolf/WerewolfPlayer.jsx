@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   subscribeSession, subscribePlayers, subscribeNightActions,
@@ -21,6 +21,7 @@ export default function WerewolfPlayer() {
   const [players, setPlayers] = useState([])
   const [nightActions, setNightActions] = useState({})
   const [roleRevealed, setRoleRevealed] = useState(false)
+  const sessionExistedRef = useRef(false)
 
   const storageKey = `ww_player_${sessionId}`
 
@@ -47,11 +48,16 @@ export default function WerewolfPlayer() {
   }, [sessionId, meta?.round])
 
   useEffect(() => {
-    if (!meta?.createdAt) return
-    if (Date.now() - meta.createdAt > SESSION_TTL) {
-      deleteSession(sessionId).then(() => navigate('/', { replace: true }))
+    if (meta) {
+      sessionExistedRef.current = true
+      if (Date.now() - meta.createdAt > SESSION_TTL) {
+        deleteSession(sessionId).then(() => navigate('/', { replace: true }))
+      }
+    } else if (sessionExistedRef.current) {
+      localStorage.removeItem(storageKey)
+      navigate('/', { replace: true })
     }
-  }, [meta, sessionId, navigate])
+  }, [meta, sessionId, navigate, storageKey])
 
   const myPlayer = players.find(p => p.id === uid)
   const myRole = myPlayer?.role
