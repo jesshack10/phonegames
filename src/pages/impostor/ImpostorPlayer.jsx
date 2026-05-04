@@ -27,6 +27,7 @@ const T = {
     ],
     mission: 'Your mission',
     close: 'Close this page after viewing',
+    newGame: 'End game & New game',
     loading: 'Loading your role…',
     notInSession: 'You are not part of this game.',
   },
@@ -53,6 +54,7 @@ const T = {
     ],
     mission: 'Tu misión',
     close: 'Cierra esta página después de ver tu rol',
+    newGame: 'Terminar partida y nueva partida',
     loading: 'Cargando tu rol…',
     notInSession: 'No formas parte de esta partida.',
   },
@@ -84,6 +86,12 @@ export default function ImpostorPlayer() {
   const myPlayer = players.find(p => p.id === uid)
   const numImpostors = meta?.numImpostors ?? 1
   const isImpostor = myPlayer?.role === 'impostor'
+  const isHost = myPlayer?.isHost === true
+
+  async function handleEndGame() {
+    await deleteSession(sessionId)
+    navigate('/impostor', { replace: true })
+  }
 
   if (!meta || !uid || players.length === 0) {
     return (
@@ -140,7 +148,15 @@ export default function ImpostorPlayer() {
           </ul>
         </div>
 
-        <p className="text-red-900 text-xs">{t.close}</p>
+        <p className="text-red-900 text-xs mb-6">{t.close}</p>
+        {isHost && (
+          <button
+            onClick={handleEndGame}
+            className="w-full max-w-xs py-4 rounded-2xl bg-white/10 active:bg-white/20 text-white font-bold text-base transition-colors"
+          >
+            {t.newGame}
+          </button>
+        )}
       </div>
     )
   }
@@ -170,7 +186,15 @@ export default function ImpostorPlayer() {
         </ul>
       </div>
 
-      <p className="text-green-950 text-xs">{t.close}</p>
+      <p className="text-green-950 text-xs mb-6">{t.close}</p>
+      {isHost && (
+        <button
+          onClick={handleEndGame}
+          className="w-full max-w-xs py-4 rounded-2xl bg-white/10 active:bg-white/20 text-white font-bold text-base transition-colors"
+        >
+          {t.newGame}
+        </button>
+      )}
     </div>
   )
 }
