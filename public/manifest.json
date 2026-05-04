@@ -1,7 +1,7 @@
 {
-  "name": "Impostor",
-  "short_name": "Impostor",
-  "description": "A social deduction party game",
+  "name": "Phone Games",
+  "short_name": "Phone Games",
+  "description": "Party games for your phone — Impostor and Werewolf",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0a18",
