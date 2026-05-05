@@ -23,7 +23,7 @@ const T = {
     creating: 'Creating…',
     errName: 'Enter your name',
     errFailed: 'Failed to create game. Try again.',
-    orJoin: 'or join an existing one',
+    orCreate: 'or create a new game',
     codePh: 'CODE',
     joinBtn: 'Join →',
     joining: 'Joining…',
@@ -46,7 +46,7 @@ const T = {
     creating: 'Creando…',
     errName: 'Escribe tu nombre',
     errFailed: 'Error al crear la partida. Intenta de nuevo.',
-    orJoin: 'o únete a una existente',
+    orCreate: 'o crea una nueva partida',
     codePh: 'CÓDIGO',
     joinBtn: 'Unirme →',
     joining: 'Uniendo…',
@@ -158,8 +158,15 @@ export default function ImpostorSetup() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a18] flex flex-col items-center justify-center px-5 py-10">
-      <div className="mb-8 text-center">
+    <div className="min-h-screen bg-[#0a0a18] flex flex-col items-center px-5 py-8 gap-5">
+      <button
+        onClick={() => navigate('/')}
+        className="text-white/40 text-sm self-start"
+      >
+        ← {lang === 'es' ? 'Atrás' : 'Back'}
+      </button>
+
+      <div className="text-center">
         <div className="text-6xl mb-3">🕵️</div>
         <h1 className="text-5xl font-black text-white tracking-tight">
           IMPOS<span className="text-red-500">TOR</span>
@@ -168,7 +175,7 @@ export default function ImpostorSetup() {
       </div>
 
       {/* Language toggle */}
-      <div className="flex gap-2 mb-6 bg-white/5 border border-white/10 rounded-2xl p-1.5">
+      <div className="flex gap-2 bg-white/5 border border-white/10 rounded-2xl p-1.5">
         {['en', 'es'].map(l => (
           <button
             key={l}
@@ -184,53 +191,17 @@ export default function ImpostorSetup() {
       </div>
 
       <div className="w-full max-w-sm flex flex-col gap-3">
-        {/* Host name */}
+        {/* Host name (shared by both flows) */}
         <div className="bg-white/5 rounded-2xl px-5 py-4 border border-white/10">
           <label className="text-white font-semibold text-lg block mb-3">{t.yourName}</label>
           <input
             type="text"
             value={name}
             onChange={e => { setName(e.target.value); setError('') }}
-            onKeyDown={e => e.key === 'Enter' && handleCreate()}
             placeholder={t.namePlaceholder}
             maxLength={16}
             className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white text-lg placeholder-white/30 outline-none focus:border-indigo-500"
           />
-        </div>
-
-        <Stepper label={t.impostors} value={numImpostors} onChange={setNumImpostors} min={1} max={5} />
-
-        {/* Category */}
-        <div className="bg-white/5 rounded-2xl px-5 py-4 border border-white/10">
-          <label className="text-white font-semibold text-lg block mb-3">{t.category}</label>
-          <div className="flex flex-wrap gap-2">
-            {[t.all, ...categoryNames].map(cat => (
-              <button
-                key={cat}
-                onClick={() => setCategory(cat)}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  category === cat ? 'bg-indigo-500 text-white' : 'bg-white/10 text-white/60 active:bg-white/20'
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <button
-          onClick={handleCreate}
-          disabled={!name.trim() || loading || joining || !ready}
-          className="mt-2 w-full bg-red-500 active:bg-red-600 text-white font-black text-xl py-5 rounded-2xl tracking-wide transition-colors shadow-lg shadow-red-500/30 disabled:opacity-40"
-        >
-          {!ready ? t.connecting : loading ? t.creating : t.createBtn}
-        </button>
-
-        {/* Divider */}
-        <div className="flex items-center gap-3 mt-2">
-          <div className="flex-1 h-px bg-white/10" />
-          <p className="text-white/30 text-xs uppercase tracking-widest">{t.orJoin}</p>
-          <div className="flex-1 h-px bg-white/10" />
         </div>
 
         {/* Join section */}
@@ -256,6 +227,41 @@ export default function ImpostorSetup() {
             {joining ? '…' : t.joinBtn}
           </button>
         </div>
+
+        {/* Divider */}
+        <div className="flex items-center gap-3 mt-2">
+          <div className="flex-1 h-px bg-white/10" />
+          <p className="text-white/30 text-xs uppercase tracking-widest">{t.orCreate}</p>
+          <div className="flex-1 h-px bg-white/10" />
+        </div>
+
+        {/* Create config */}
+        <Stepper label={t.impostors} value={numImpostors} onChange={setNumImpostors} min={1} max={5} />
+
+        <div className="bg-white/5 rounded-2xl px-5 py-4 border border-white/10">
+          <label className="text-white font-semibold text-lg block mb-3">{t.category}</label>
+          <div className="flex flex-wrap gap-2">
+            {[t.all, ...categoryNames].map(cat => (
+              <button
+                key={cat}
+                onClick={() => setCategory(cat)}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  category === cat ? 'bg-indigo-500 text-white' : 'bg-white/10 text-white/60 active:bg-white/20'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button
+          onClick={handleCreate}
+          disabled={!name.trim() || loading || joining || !ready}
+          className="mt-2 w-full bg-red-500 active:bg-red-600 text-white font-black text-xl py-5 rounded-2xl tracking-wide transition-colors shadow-lg shadow-red-500/30 disabled:opacity-40"
+        >
+          {!ready ? t.connecting : loading ? t.creating : t.createBtn}
+        </button>
 
         {error && <p className="text-red-400 text-sm text-center">{error}</p>}
       </div>

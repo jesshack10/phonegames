@@ -102,27 +102,9 @@ export default function PeticionesSetup() {
           className="w-full px-4 py-4 rounded-xl bg-white/10 border border-white/20 text-white text-lg placeholder-white/30 outline-none focus:border-blue-500"
         />
 
-        {/* Create section */}
-        <div className="flex flex-col gap-2">
-          <p className="text-white/40 text-xs uppercase tracking-widest">Empieza una sesión</p>
-          <button
-            onClick={handleCreate}
-            disabled={!ready || !uid || !name.trim() || creating || joining}
-            className="w-full py-5 rounded-2xl bg-blue-500 active:bg-blue-600 text-white font-black text-xl tracking-wide shadow-lg shadow-blue-500/20 disabled:opacity-40 transition-colors"
-          >
-            {!ready ? 'Conectando…' : creating ? 'Creando…' : 'Crear sesión →'}
-          </button>
-        </div>
-
-        {/* Divider */}
-        <div className="flex items-center gap-3">
-          <div className="flex-1 h-px bg-white/10" />
-          <p className="text-white/30 text-xs uppercase tracking-widest">o únete a una existente</p>
-          <div className="flex-1 h-px bg-white/10" />
-        </div>
-
         {/* Join section */}
         <div className="flex flex-col gap-2">
+          <p className="text-white/40 text-xs uppercase tracking-widest">Únete con código</p>
           <div className="flex gap-2">
             <input
               type="text"
@@ -146,6 +128,22 @@ export default function PeticionesSetup() {
             </button>
           </div>
         </div>
+
+        {/* Divider */}
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-px bg-white/10" />
+          <p className="text-white/30 text-xs uppercase tracking-widest">o crea una nueva sesión</p>
+          <div className="flex-1 h-px bg-white/10" />
+        </div>
+
+        {/* Create section */}
+        <button
+          onClick={handleCreate}
+          disabled={!ready || !uid || !name.trim() || creating || joining}
+          className="w-full py-5 rounded-2xl bg-blue-500 active:bg-blue-600 text-white font-black text-xl tracking-wide shadow-lg shadow-blue-500/20 disabled:opacity-40 transition-colors"
+        >
+          {!ready ? 'Conectando…' : creating ? 'Creando…' : 'Crear sesión →'}
+        </button>
 
         {error && <p className="text-red-400 text-sm text-center">{error}</p>}
       </div>

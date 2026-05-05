@@ -152,6 +152,47 @@ export default function WerewolfSetup() {
     <div className="min-h-screen bg-[#0a0a18] flex flex-col px-6 py-10 gap-6">
       <button onClick={() => navigate('/')} className="text-white/40 text-sm self-start">← Back</button>
       <h1 className="text-white text-3xl font-bold tracking-wide">🐺 Werewolf</h1>
+
+      {/* Join section */}
+      <input
+        type="text"
+        value={joinName}
+        onChange={e => { setJoinName(e.target.value); setJoinError('') }}
+        placeholder="Your name…"
+        maxLength={16}
+        className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white text-lg placeholder-white/30 outline-none focus:border-red-500"
+      />
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={joinCode}
+          onChange={e => { setJoinCode(e.target.value.toUpperCase()); setJoinError('') }}
+          onKeyDown={e => e.key === 'Enter' && handleJoin()}
+          placeholder="CODE"
+          maxLength={6}
+          autoCapitalize="characters"
+          autoCorrect="off"
+          autoComplete="off"
+          spellCheck={false}
+          className="flex-1 px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white text-center text-lg font-mono font-bold tracking-widest placeholder-white/30 outline-none focus:border-white/40"
+        />
+        <button
+          onClick={handleJoin}
+          disabled={!ready || !uid || !joinName.trim() || joinCode.trim().length !== 6 || loading || joining}
+          className="px-5 py-3 rounded-xl bg-white/10 active:bg-white/20 text-white font-bold disabled:opacity-30 transition-colors"
+        >
+          {joining ? '…' : 'Join →'}
+        </button>
+      </div>
+      {joinError && <p className="text-red-400 text-sm text-center">{joinError}</p>}
+
+      {/* Divider */}
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-px bg-white/10" />
+        <p className="text-white/30 text-xs uppercase tracking-widest">or create a new game</p>
+        <div className="flex-1 h-px bg-white/10" />
+      </div>
+
       <p className="text-white/50 text-sm">Configure your game as the moderator.</p>
 
       <div>
@@ -209,46 +250,6 @@ export default function WerewolfSetup() {
       >
         {!ready ? 'Connecting…' : loading ? 'Creating...' : !uid ? 'Firebase not configured' : 'Create Session →'}
       </button>
-
-      {/* Divider */}
-      <div className="flex items-center gap-3 mt-2">
-        <div className="flex-1 h-px bg-white/10" />
-        <p className="text-white/30 text-xs uppercase tracking-widest">or join an existing game</p>
-        <div className="flex-1 h-px bg-white/10" />
-      </div>
-
-      {/* Join section */}
-      <input
-        type="text"
-        value={joinName}
-        onChange={e => { setJoinName(e.target.value); setJoinError('') }}
-        placeholder="Your name…"
-        maxLength={16}
-        className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white text-lg placeholder-white/30 outline-none focus:border-red-500"
-      />
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={joinCode}
-          onChange={e => { setJoinCode(e.target.value.toUpperCase()); setJoinError('') }}
-          onKeyDown={e => e.key === 'Enter' && handleJoin()}
-          placeholder="CODE"
-          maxLength={6}
-          autoCapitalize="characters"
-          autoCorrect="off"
-          autoComplete="off"
-          spellCheck={false}
-          className="flex-1 px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white text-center text-lg font-mono font-bold tracking-widest placeholder-white/30 outline-none focus:border-white/40"
-        />
-        <button
-          onClick={handleJoin}
-          disabled={!ready || !uid || !joinName.trim() || joinCode.trim().length !== 6 || loading || joining}
-          className="px-5 py-3 rounded-xl bg-white/10 active:bg-white/20 text-white font-bold disabled:opacity-30 transition-colors"
-        >
-          {joining ? '…' : 'Join →'}
-        </button>
-      </div>
-      {joinError && <p className="text-red-400 text-sm text-center">{joinError}</p>}
     </div>
   )
 }
