@@ -35,15 +35,18 @@ export default function PeticionesHost() {
   const [myText, setMyText] = useState('')
   const [submittingMine, setSubmittingMine] = useState(false)
   const [myError, setMyError] = useState('')
+  const [readError, setReadError] = useState('')
   const sessionExistedRef = useRef(false)
 
   const me = players.find(p => p.id === uid)
   const mySubmitted = !!me?.submitted
 
   useEffect(() => {
-    const u1 = subscribePeticionesSession(sessionId, setMeta)
-    const u2 = subscribePeticionesPlayers(sessionId, setPlayers)
-    const u3 = subscribePeticiones(sessionId, setPetitions)
+    const onErr = (label) => (err) =>
+      setReadError(`${label}: ${err?.code || err?.message || 'desconocido'}`)
+    const u1 = subscribePeticionesSession(sessionId, setMeta, onErr('meta'))
+    const u2 = subscribePeticionesPlayers(sessionId, setPlayers, onErr('players'))
+    const u3 = subscribePeticiones(sessionId, setPetitions, onErr('petitions'))
     return () => { u1(); u2(); u3() }
   }, [sessionId])
 
@@ -148,6 +151,12 @@ export default function PeticionesHost() {
           {totalCount === 1 ? 'participante ha enviado' : 'participantes han enviado'}
         </p>
       </div>
+
+      {readError && (
+        <div className="w-full max-w-md bg-red-500/10 border border-red-500/40 rounded-2xl px-4 py-3">
+          <p className="text-red-300 text-xs font-mono break-all">⚠ {readError}</p>
+        </div>
+      )}
 
       {/* Participant chips */}
       {players.length > 0 && (

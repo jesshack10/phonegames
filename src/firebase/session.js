@@ -282,31 +282,43 @@ export async function joinPeticionesPlayer(sessionId, uid, name) {
   await set(playerRef, { name, joinedAt: Date.now(), submitted: false })
 }
 
-export function subscribePeticionesSession(sessionId, cb) {
+export function subscribePeticionesSession(sessionId, cb, onError) {
   const r = ref(db, `sessions/${sessionId}/meta`)
-  onValue(r, snap => cb(snap.val()))
+  onValue(
+    r,
+    snap => cb(snap.val()),
+    err => { console.error('subscribePeticionesSession error:', err); onError?.(err) }
+  )
   return () => off(r)
 }
 
-export function subscribePeticionesPlayers(sessionId, cb) {
+export function subscribePeticionesPlayers(sessionId, cb, onError) {
   const r = ref(db, `sessions/${sessionId}/players`)
-  onValue(r, snap => {
-    const val = snap.val() || {}
-    cb(Object.entries(val).map(([id, data]) => ({ id, ...data })))
-  })
+  onValue(
+    r,
+    snap => {
+      const val = snap.val() || {}
+      cb(Object.entries(val).map(([id, data]) => ({ id, ...data })))
+    },
+    err => { console.error('subscribePeticionesPlayers error:', err); onError?.(err) }
+  )
   return () => off(r)
 }
 
-export function subscribePeticiones(sessionId, cb) {
+export function subscribePeticiones(sessionId, cb, onError) {
   const r = ref(db, `sessions/${sessionId}/petitions`)
-  onValue(r, snap => {
-    const val = snap.val() || {}
-    cb(
-      Object.entries(val)
-        .map(([id, data]) => ({ id, ...data }))
-        .sort((a, b) => a.submittedAt - b.submittedAt)
-    )
-  })
+  onValue(
+    r,
+    snap => {
+      const val = snap.val() || {}
+      cb(
+        Object.entries(val)
+          .map(([id, data]) => ({ id, ...data }))
+          .sort((a, b) => a.submittedAt - b.submittedAt)
+      )
+    },
+    err => { console.error('subscribePeticiones error:', err); onError?.(err) }
+  )
   return () => off(r)
 }
 
