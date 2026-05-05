@@ -16,11 +16,12 @@ function formatPetitions(petitions) {
   const date = new Date().toLocaleDateString('es', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   })
-  const header = `# Peticiones — ${date}\n\n`
+  const title = `Peticiones · ${date}`
+  const divider = '─'.repeat(Math.max(title.length, 24))
   const body = petitions
-    .map(p => `**${p.name}**\n\n${p.text.trim()}`)
-    .join('\n\n---\n\n')
-  return header + body + '\n'
+    .map(p => `${p.name}\n${p.text.trim()}`)
+    .join('\n\n')
+  return `${title}\n${divider}\n\n${body}\n`
 }
 
 export default function PeticionesHost() {
