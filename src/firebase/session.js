@@ -311,10 +311,14 @@ export function subscribePeticiones(sessionId, cb) {
 }
 
 export async function submitPeticion(sessionId, uid, name, text) {
-  const updates = {}
-  updates[`sessions/${sessionId}/petitions/${uid}`] = { name, text, submittedAt: Date.now() }
-  updates[`sessions/${sessionId}/players/${uid}/submitted`] = true
-  await update(ref(db), updates)
+  await set(
+    ref(db, `sessions/${sessionId}/petitions/${uid}`),
+    { name, text, submittedAt: Date.now() }
+  )
+  await update(
+    ref(db, `sessions/${sessionId}/players/${uid}`),
+    { submitted: true }
+  )
 }
 
 export async function getPeticionesMeta(sessionId) {

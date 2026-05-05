@@ -100,8 +100,10 @@ export default function PeticionesHost() {
     try {
       await submitPeticion(sessionId, uid, me.name, trimmed)
       setMyText('')
-    } catch {
-      setMyError('Error al enviar. Intenta de nuevo.')
+    } catch (e) {
+      console.error('submitPeticion failed:', e)
+      const code = e?.code || e?.message || 'desconocido'
+      setMyError(`Error al enviar: ${code}`)
     } finally {
       setSubmittingMine(false)
     }

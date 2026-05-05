@@ -64,8 +64,10 @@ export default function PeticionesPlayer() {
     try {
       await submitPeticion(sessionId, uid, myName, trimmed)
       setSubmitted(true)
-    } catch {
-      setError('Error al enviar. Intenta de nuevo.')
+    } catch (e) {
+      console.error('submitPeticion failed:', e)
+      const code = e?.code || e?.message || 'desconocido'
+      setError(`Error al enviar: ${code}`)
       setSubmitting(false)
     }
   }
