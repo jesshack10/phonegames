@@ -1,8 +1,15 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
-import { createSession, setHostPlayer } from '../firebase/session.js'
-import { suggestRoles } from '../utils/werewolf.js'
+import {
+  createSession,
+  setHostPlayer,
+  joinSession,
+  lookupSessionGame,
+  SESSION_TTL,
+  deleteSession,
+} from '../firebase/session.js'
+import { suggestRoles, generateAvatar } from '../utils/werewolf.js'
 import { useAuth } from '../hooks/useAuth.js'
 import RoleBalanceBadge from '../components/werewolf/RoleBalanceBadge.jsx'
 import ShareSessionLink from '../components/ShareSessionLink.jsx'
@@ -14,6 +21,10 @@ export default function WerewolfSetup() {
   const [roleConfig, setRoleConfig] = useState(suggestRoles(6))
   const [sessionId, setSessionId] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [joinName, setJoinName] = useState('')
+  const [joinCode, setJoinCode] = useState('')
+  const [joining, setJoining] = useState(false)
+  const [joinError, setJoinError] = useState('')
 
   const total = roleConfig.werewolves + roleConfig.seers + roleConfig.doctors + roleConfig.villagers
   const isValid = total === playerCount && roleConfig.villagers >= 0
@@ -41,6 +52,50 @@ export default function WerewolfSetup() {
       setSessionId(id)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleJoin() {
+    const trimmed = joinName.trim()
+    if (!trimmed) return setJoinError('Enter your name')
+    if (trimmed.length > 16) return setJoinError('Name too long (max 16)')
+    const normalized = joinCode.trim().toUpperCase()
+    if (normalized.length !== 6) return setJoinError('Code must be 6 characters')
+    if (!uid || joining || loading) return
+
+    setJoining(true)
+    setJoinError('')
+    try {
+      const { meta, game } = await lookupSessionGame(normalized)
+      if (!meta) {
+        setJoinError('Session not found')
+        return
+      }
+      if (game !== 'werewolf') {
+        setJoinError("That code isn't a Werewolf game")
+        return
+      }
+      if (Date.now() - meta.createdAt > SESSION_TTL) {
+        await deleteSession(normalized)
+        setJoinError('Session expired')
+        return
+      }
+      if (meta.phase !== 'lobby') {
+        setJoinError('This game has already started')
+        return
+      }
+      const avatar = generateAvatar()
+      await joinSession(normalized, uid, trimmed, avatar)
+      localStorage.setItem(
+        `ww_player_${normalized}`,
+        JSON.stringify({ playerId: uid, name: trimmed, avatar })
+      )
+      navigate(`/werewolf/lobby/${normalized}`, { replace: true })
+    } catch (e) {
+      console.error('join failed:', e)
+      setJoinError(`Failed to join: ${e?.code || e?.message || ''}`)
+    } finally {
+      setJoining(false)
     }
   }
 
@@ -149,11 +204,51 @@ export default function WerewolfSetup() {
 
       <button
         onClick={handleCreate}
-        disabled={!isValid || loading || !ready || !uid}
+        disabled={!isValid || loading || joining || !ready || !uid}
         className="w-full py-4 rounded-2xl bg-red-700 border border-red-500 text-white text-lg font-bold disabled:opacity-40 active:scale-95 transition-transform mt-auto"
       >
         {!ready ? 'Connecting…' : loading ? 'Creating...' : !uid ? 'Firebase not configured' : 'Create Session →'}
       </button>
+
+      {/* Divider */}
+      <div className="flex items-center gap-3 mt-2">
+        <div className="flex-1 h-px bg-white/10" />
+        <p className="text-white/30 text-xs uppercase tracking-widest">or join an existing game</p>
+        <div className="flex-1 h-px bg-white/10" />
+      </div>
+
+      {/* Join section */}
+      <input
+        type="text"
+        value={joinName}
+        onChange={e => { setJoinName(e.target.value); setJoinError('') }}
+        placeholder="Your name…"
+        maxLength={16}
+        className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white text-lg placeholder-white/30 outline-none focus:border-red-500"
+      />
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={joinCode}
+          onChange={e => { setJoinCode(e.target.value.toUpperCase()); setJoinError('') }}
+          onKeyDown={e => e.key === 'Enter' && handleJoin()}
+          placeholder="CODE"
+          maxLength={6}
+          autoCapitalize="characters"
+          autoCorrect="off"
+          autoComplete="off"
+          spellCheck={false}
+          className="flex-1 px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white text-center text-lg font-mono font-bold tracking-widest placeholder-white/30 outline-none focus:border-white/40"
+        />
+        <button
+          onClick={handleJoin}
+          disabled={!ready || !uid || !joinName.trim() || joinCode.trim().length !== 6 || loading || joining}
+          className="px-5 py-3 rounded-xl bg-white/10 active:bg-white/20 text-white font-bold disabled:opacity-30 transition-colors"
+        >
+          {joining ? '…' : 'Join →'}
+        </button>
+      </div>
+      {joinError && <p className="text-red-400 text-sm text-center">{joinError}</p>}
     </div>
   )
 }

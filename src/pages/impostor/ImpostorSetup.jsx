@@ -1,7 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getCategoryNames } from '../../data/words.js'
-import { createImpostorSession, joinImpostorPlayer } from '../../firebase/session.js'
+import {
+  createImpostorSession,
+  joinImpostorPlayer,
+  lookupSessionGame,
+  SESSION_TTL,
+  deleteSession,
+} from '../../firebase/session.js'
 import { useAuth } from '../../hooks/useAuth.js'
 
 const T = {
@@ -17,6 +23,16 @@ const T = {
     creating: 'Creating…',
     errName: 'Enter your name',
     errFailed: 'Failed to create game. Try again.',
+    orJoin: 'or join an existing one',
+    codePh: 'CODE',
+    joinBtn: 'Join →',
+    joining: 'Joining…',
+    errCodeLen: 'Code must be 6 characters',
+    errNotFound: 'Session not found',
+    errWrongGame: 'That code is not an Impostor game',
+    errExpired: 'Session expired',
+    errStarted: 'Game already started',
+    errJoinFailed: 'Failed to join',
   },
   es: {
     tagline: 'Encuentra al espía entre ustedes',
@@ -30,6 +46,16 @@ const T = {
     creating: 'Creando…',
     errName: 'Escribe tu nombre',
     errFailed: 'Error al crear la partida. Intenta de nuevo.',
+    orJoin: 'o únete a una existente',
+    codePh: 'CÓDIGO',
+    joinBtn: 'Unirme →',
+    joining: 'Uniendo…',
+    errCodeLen: 'El código debe tener 6 caracteres',
+    errNotFound: 'Sesión no encontrada',
+    errWrongGame: 'Ese código no es de Impostor',
+    errExpired: 'Sesión expirada',
+    errStarted: 'El juego ya comenzó',
+    errJoinFailed: 'Error al unirte',
   },
 }
 
@@ -61,7 +87,9 @@ export default function ImpostorSetup() {
   const [numImpostors, setNumImpostors] = useState(1)
   const [category, setCategory] = useState('Todas')
   const [name, setName] = useState('')
+  const [code, setCode] = useState('')
   const [loading, setLoading] = useState(false)
+  const [joining, setJoining] = useState(false)
   const [error, setError] = useState('')
 
   const t = T[lang]
@@ -75,7 +103,7 @@ export default function ImpostorSetup() {
   async function handleCreate() {
     const trimmed = name.trim()
     if (!trimmed) return setError(t.errName)
-    if (!uid) return
+    if (!uid || loading || joining) return
     setLoading(true)
     setError('')
     try {
@@ -87,6 +115,45 @@ export default function ImpostorSetup() {
       setError(t.errFailed)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleJoin() {
+    const trimmed = name.trim()
+    if (!trimmed) return setError(t.errName)
+    const normalized = code.trim().toUpperCase()
+    if (normalized.length !== 6) return setError(t.errCodeLen)
+    if (!uid || loading || joining) return
+
+    setJoining(true)
+    setError('')
+    try {
+      const { meta, game } = await lookupSessionGame(normalized)
+      if (!meta) {
+        setError(t.errNotFound)
+        return
+      }
+      if (game !== 'impostor') {
+        setError(t.errWrongGame)
+        return
+      }
+      if (Date.now() - meta.createdAt > SESSION_TTL) {
+        await deleteSession(normalized)
+        setError(t.errExpired)
+        return
+      }
+      if (meta.phase !== 'lobby') {
+        setError(t.errStarted)
+        return
+      }
+      await joinImpostorPlayer(normalized, uid, trimmed, false)
+      localStorage.setItem(`imp_${normalized}`, JSON.stringify({ uid, name: trimmed }))
+      navigate(`/impostor/lobby/${normalized}`, { replace: true })
+    } catch (e) {
+      console.error('join failed:', e)
+      setError(`${t.errJoinFailed}: ${e?.code || e?.message || ''}`)
+    } finally {
+      setJoining(false)
     }
   }
 
@@ -151,15 +218,46 @@ export default function ImpostorSetup() {
           </div>
         </div>
 
-        {error && <p className="text-red-400 text-sm text-center">{error}</p>}
-
         <button
           onClick={handleCreate}
-          disabled={!name.trim() || loading || !ready}
+          disabled={!name.trim() || loading || joining || !ready}
           className="mt-2 w-full bg-red-500 active:bg-red-600 text-white font-black text-xl py-5 rounded-2xl tracking-wide transition-colors shadow-lg shadow-red-500/30 disabled:opacity-40"
         >
           {!ready ? t.connecting : loading ? t.creating : t.createBtn}
         </button>
+
+        {/* Divider */}
+        <div className="flex items-center gap-3 mt-2">
+          <div className="flex-1 h-px bg-white/10" />
+          <p className="text-white/30 text-xs uppercase tracking-widest">{t.orJoin}</p>
+          <div className="flex-1 h-px bg-white/10" />
+        </div>
+
+        {/* Join section */}
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={code}
+            onChange={e => { setCode(e.target.value.toUpperCase()); setError('') }}
+            onKeyDown={e => e.key === 'Enter' && handleJoin()}
+            placeholder={t.codePh}
+            maxLength={6}
+            autoCapitalize="characters"
+            autoCorrect="off"
+            autoComplete="off"
+            spellCheck={false}
+            className="flex-1 px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white text-center text-lg font-mono font-bold tracking-widest placeholder-white/30 outline-none focus:border-white/40"
+          />
+          <button
+            onClick={handleJoin}
+            disabled={!ready || !uid || !name.trim() || code.trim().length !== 6 || loading || joining}
+            className="px-5 py-3 rounded-xl bg-white/10 active:bg-white/20 text-white font-bold disabled:opacity-30 transition-colors"
+          >
+            {joining ? '…' : t.joinBtn}
+          </button>
+        </div>
+
+        {error && <p className="text-red-400 text-sm text-center">{error}</p>}
       </div>
     </div>
   )
