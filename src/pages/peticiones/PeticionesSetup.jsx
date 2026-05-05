@@ -1,20 +1,27 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createPeticionesSession } from '../../firebase/session.js'
+import { createPeticionesSession, joinPeticionesPlayer } from '../../firebase/session.js'
 import { useAuth } from '../../hooks/useAuth.js'
 
 export default function PeticionesSetup() {
   const navigate = useNavigate()
   const { uid, ready } = useAuth()
+  const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   async function handleCreate() {
+    const trimmed = name.trim()
+    if (!trimmed) return setError('Escribe tu nombre')
+    if (trimmed.length > 24) return setError('Nombre muy largo (máx 24)')
     if (!uid || loading) return
+
     setLoading(true)
     setError('')
     try {
       const sessionId = await createPeticionesSession(uid)
+      await joinPeticionesPlayer(sessionId, uid, trimmed)
+      localStorage.setItem(`pet_${sessionId}`, JSON.stringify({ uid, name: trimmed }))
       navigate(`/peticiones/host/${sessionId}`, { replace: true })
     } catch {
       setError('Error al crear la sesión. Intenta de nuevo.')
@@ -40,11 +47,21 @@ export default function PeticionesSetup() {
           Recoge las peticiones de los participantes en una sola pantalla.
         </p>
 
+        <input
+          type="text"
+          placeholder="Tu nombre…"
+          value={name}
+          onChange={e => { setName(e.target.value); setError('') }}
+          onKeyDown={e => e.key === 'Enter' && handleCreate()}
+          maxLength={24}
+          className="w-full px-4 py-4 rounded-xl bg-white/10 border border-white/20 text-white text-lg placeholder-white/30 outline-none focus:border-blue-500"
+        />
+
         {error && <p className="text-red-400 text-sm">{error}</p>}
 
         <button
           onClick={handleCreate}
-          disabled={!ready || !uid || loading}
+          disabled={!ready || !uid || !name.trim() || loading}
           className="w-full py-5 rounded-2xl bg-blue-500 active:bg-blue-600 text-white font-black text-xl tracking-wide shadow-lg shadow-blue-500/20 disabled:opacity-40 transition-colors"
         >
           {!ready ? 'Conectando…' : loading ? 'Creando…' : 'Crear sesión →'}

@@ -5,9 +5,11 @@ import {
   subscribePeticionesSession,
   subscribePeticionesPlayers,
   subscribePeticiones,
+  submitPeticion,
   deleteSession,
   SESSION_TTL,
 } from '../../firebase/session.js'
+import { useAuth } from '../../hooks/useAuth.js'
 
 function formatPetitions(petitions) {
   if (petitions.length === 0) return ''
@@ -24,12 +26,19 @@ function formatPetitions(petitions) {
 export default function PeticionesHost() {
   const { sessionId } = useParams()
   const navigate = useNavigate()
+  const { uid } = useAuth()
   const [meta, setMeta] = useState(null)
   const [players, setPlayers] = useState([])
   const [petitions, setPetitions] = useState([])
   const [copied, setCopied] = useState(false)
   const [confirmEnd, setConfirmEnd] = useState(false)
+  const [myText, setMyText] = useState('')
+  const [submittingMine, setSubmittingMine] = useState(false)
+  const [myError, setMyError] = useState('')
   const sessionExistedRef = useRef(false)
+
+  const me = players.find(p => p.id === uid)
+  const mySubmitted = !!me?.submitted
 
   useEffect(() => {
     const u1 = subscribePeticionesSession(sessionId, setMeta)
@@ -82,6 +91,22 @@ export default function PeticionesHost() {
     navigate('/', { replace: true })
   }
 
+  async function handleSubmitMine() {
+    const trimmed = myText.trim()
+    if (!trimmed) return setMyError('Escribe tu petición primero')
+    if (!uid || !me?.name || submittingMine) return
+    setSubmittingMine(true)
+    setMyError('')
+    try {
+      await submitPeticion(sessionId, uid, me.name, trimmed)
+      setMyText('')
+    } catch {
+      setMyError('Error al enviar. Intenta de nuevo.')
+    } finally {
+      setSubmittingMine(false)
+    }
+  }
+
   if (!meta) {
     return (
       <div className="min-h-screen bg-[#0a0a18] flex items-center justify-center">
@@ -132,11 +157,38 @@ export default function PeticionesHost() {
                 p.submitted
                   ? 'bg-blue-500/20 border-blue-500/40 text-blue-300'
                   : 'bg-white/5 border-white/10 text-white/50'
-              }`}
+              } ${p.id === uid ? 'ring-1 ring-white/30' : ''}`}
             >
-              {p.submitted ? '✓ ' : '○ '}{p.name}
+              {p.submitted ? '✓ ' : '○ '}{p.name}{p.id === uid ? ' (tú)' : ''}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Mi petición — host's own submission */}
+      {me && !mySubmitted && (
+        <div className="w-full max-w-md flex flex-col gap-2 bg-white/5 border border-white/10 rounded-2xl p-4">
+          <p className="text-white/80 text-sm font-semibold">Tu petición</p>
+          <textarea
+            value={myText}
+            onChange={e => { setMyText(e.target.value); setMyError('') }}
+            placeholder="Escribe tu petición…"
+            rows={4}
+            className="w-full px-3 py-3 rounded-xl bg-white/10 border border-white/20 text-white text-sm placeholder-white/30 outline-none focus:border-blue-500 resize-none leading-relaxed"
+          />
+          {myError && <p className="text-red-400 text-xs">{myError}</p>}
+          <button
+            onClick={handleSubmitMine}
+            disabled={!myText.trim() || submittingMine}
+            className="w-full py-3 rounded-xl bg-blue-500 active:bg-blue-600 text-white text-sm font-bold disabled:opacity-40 transition-colors"
+          >
+            {submittingMine ? 'Enviando…' : 'Enviar mi petición →'}
+          </button>
+        </div>
+      )}
+      {me && mySubmitted && (
+        <div className="w-full max-w-md flex items-center justify-center gap-2 bg-blue-500/10 border border-blue-500/30 rounded-2xl px-4 py-3">
+          <span className="text-blue-300 text-sm font-semibold">✓ Tu petición ya está enviada</span>
         </div>
       )}
 
