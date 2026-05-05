@@ -10,6 +10,7 @@ import {
 } from '../../firebase/session.js'
 import { getRandomWord } from '../../data/words.js'
 import { useAuth } from '../../hooks/useAuth.js'
+import ShareSessionLink from '../../components/ShareSessionLink.jsx'
 
 const T = {
   en: {
@@ -21,6 +22,11 @@ const T = {
     assignBtn: 'Assign Roles →',
     assigning: 'Assigning…',
     host: 'you',
+    copyLink: 'Copy link',
+    copied: 'Copied! ✓',
+    share: 'Share',
+    shareTitle: 'Impostor',
+    shareText: (id) => `Join the Impostor game (code ${id})`,
   },
   es: {
     waiting: 'Esperando jugadores…',
@@ -31,6 +37,11 @@ const T = {
     assignBtn: 'Asignar roles →',
     assigning: 'Asignando…',
     host: 'tú',
+    copyLink: 'Copiar enlace',
+    copied: '¡Copiado! ✓',
+    share: 'Compartir',
+    shareTitle: 'Impostor',
+    shareText: (id) => `Únete al juego de Impostor (código ${id})`,
   },
 }
 
@@ -101,6 +112,17 @@ export default function ImpostorHost() {
         <p className="text-white/40 text-xs mb-1">{t.scanToJoin}</p>
         <p className="text-white/30 text-xs mb-3">{t.code}</p>
         <p className="text-white text-3xl font-mono font-bold tracking-widest">{sessionId}</p>
+      </div>
+
+      <div className="w-full max-w-xs">
+        <ShareSessionLink
+          url={lobbyUrl}
+          shareTitle={t.shareTitle}
+          shareText={t.shareText(sessionId)}
+          copyLabel={t.copyLink}
+          copiedLabel={t.copied}
+          shareLabel={t.share}
+        />
       </div>
 
       <div className="w-full max-w-xs">

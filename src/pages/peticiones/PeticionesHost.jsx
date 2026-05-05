@@ -10,6 +10,7 @@ import {
   SESSION_TTL,
 } from '../../firebase/session.js'
 import { useAuth } from '../../hooks/useAuth.js'
+import ShareSessionLink from '../../components/ShareSessionLink.jsx'
 
 function formatPetitions(petitions) {
   if (petitions.length === 0) return ''
@@ -32,7 +33,6 @@ export default function PeticionesHost() {
   const [players, setPlayers] = useState([])
   const [petitions, setPetitions] = useState([])
   const [copied, setCopied] = useState(false)
-  const [linkCopied, setLinkCopied] = useState(false)
   const [confirmEnd, setConfirmEnd] = useState(false)
   const [myText, setMyText] = useState('')
   const [submittingMine, setSubmittingMine] = useState(false)
@@ -86,35 +86,6 @@ export default function PeticionesHost() {
     }
   }
 
-  async function handleCopyLink() {
-    try {
-      await navigator.clipboard.writeText(lobbyUrl)
-    } catch {
-      const ta = document.createElement('textarea')
-      ta.value = lobbyUrl
-      document.body.appendChild(ta)
-      ta.select()
-      try { document.execCommand('copy') } catch {}
-      document.body.removeChild(ta)
-    }
-    setLinkCopied(true)
-    setTimeout(() => setLinkCopied(false), 2000)
-  }
-
-  async function handleShareLink() {
-    try {
-      await navigator.share({
-        title: 'Peticiones',
-        text: `Únete a la sesión de peticiones (código ${sessionId})`,
-        url: lobbyUrl,
-      })
-    } catch {
-      // User cancelled or share unavailable — fall back to copy
-      handleCopyLink()
-    }
-  }
-
-  const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
 
   async function handleEnd() {
     if (!confirmEnd) {
@@ -174,32 +145,14 @@ export default function PeticionesHost() {
         <p className="text-white/40 text-xs">Escanea o comparte el enlace</p>
         <p className="text-white text-3xl font-mono font-bold tracking-widest">{sessionId}</p>
 
-        {/* URL preview (truncated) */}
-        <div
-          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 cursor-pointer active:bg-white/10 transition-colors"
-          onClick={handleCopyLink}
-          title={lobbyUrl}
-        >
-          <p className="text-white/50 text-[11px] font-mono truncate">{lobbyUrl}</p>
-        </div>
-
-        {/* Copy / Share buttons */}
-        <div className="w-full flex gap-2">
-          <button
-            onClick={handleCopyLink}
-            className="flex-1 py-2.5 rounded-xl bg-white/10 active:bg-white/20 text-white/90 text-sm font-semibold transition-colors"
-          >
-            {linkCopied ? '¡Copiado! ✓' : '🔗 Copiar enlace'}
-          </button>
-          {canShare && (
-            <button
-              onClick={handleShareLink}
-              className="flex-1 py-2.5 rounded-xl bg-blue-500/20 border border-blue-500/40 active:bg-blue-500/30 text-blue-200 text-sm font-semibold transition-colors"
-            >
-              📤 Compartir
-            </button>
-          )}
-        </div>
+        <ShareSessionLink
+          url={lobbyUrl}
+          shareTitle="Peticiones"
+          shareText={`Únete a la sesión de peticiones (código ${sessionId})`}
+          copyLabel="Copiar enlace"
+          copiedLabel="¡Copiado! ✓"
+          shareLabel="Compartir"
+        />
       </div>
 
       {/* Counter */}

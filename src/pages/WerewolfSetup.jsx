@@ -5,6 +5,7 @@ import { createSession, setHostPlayer } from '../firebase/session.js'
 import { suggestRoles } from '../utils/werewolf.js'
 import { useAuth } from '../hooks/useAuth.js'
 import RoleBalanceBadge from '../components/werewolf/RoleBalanceBadge.jsx'
+import ShareSessionLink from '../components/ShareSessionLink.jsx'
 
 export default function WerewolfSetup() {
   const navigate = useNavigate()
@@ -60,6 +61,14 @@ export default function WerewolfSetup() {
         <div className="text-center">
           <p className="text-white/40 text-xs mb-1">Session code</p>
           <p className="text-white text-4xl font-mono font-bold tracking-widest">{sessionId}</p>
+        </div>
+
+        <div className="w-full max-w-xs">
+          <ShareSessionLink
+            url={lobbyUrl}
+            shareTitle="Werewolf"
+            shareText={`Join the Werewolf game (code ${sessionId})`}
+          />
         </div>
 
         <div className="w-full max-w-xs text-center text-white/50 text-xs">
