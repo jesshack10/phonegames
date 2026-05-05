@@ -192,6 +192,21 @@ export async function getSessionMeta(sessionId) {
   return snap.val()
 }
 
+// Looks up a session by its 6-char code and detects which game it belongs to
+// by sniffing meta-shape fields. Returns { meta, game } where game is one of
+// 'werewolf' | 'impostor' | 'peticiones', or both null if the session doesn't
+// exist.
+export async function lookupSessionGame(sessionId) {
+  const snap = await get(ref(db, `sessions/${sessionId}/meta`))
+  const meta = snap.val()
+  if (!meta) return { meta: null, game: null }
+  let game
+  if (meta.roleConfig) game = 'werewolf'
+  else if (meta.numImpostors !== undefined) game = 'impostor'
+  else game = 'peticiones'
+  return { meta, game }
+}
+
 // ─── IMPOSTOR GAME ────────────────────────────────────────────────────────────
 
 export async function createImpostorSession(hostId, config) {
