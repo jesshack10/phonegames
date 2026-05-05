@@ -322,10 +322,10 @@ export function subscribePeticiones(sessionId, cb, onError) {
   return () => off(r)
 }
 
-export async function submitPeticion(sessionId, uid, name, text) {
+export async function submitPeticion(sessionId, uid, name, text, anonymous = false) {
   await set(
     ref(db, `sessions/${sessionId}/petitions/${uid}`),
-    { name, text, submittedAt: Date.now() }
+    { name, text, submittedAt: Date.now(), anonymous: !!anonymous }
   )
   await update(
     ref(db, `sessions/${sessionId}/players/${uid}`),
@@ -336,4 +336,46 @@ export async function submitPeticion(sessionId, uid, name, text) {
 export async function getPeticionesMeta(sessionId) {
   const snap = await get(ref(db, `sessions/${sessionId}/meta`))
   return snap.val()
+}
+
+// Sattolo's algorithm — produces a single-cycle permutation, which has no
+// fixed points for n >= 2 (i.e. a derangement: nobody gets their own petition).
+function derangePermutation(n) {
+  if (n < 2) return null
+  const p = Array.from({ length: n }, (_, i) => i)
+  for (let i = n - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * i)
+    ;[p[i], p[j]] = [p[j], p[i]]
+  }
+  return p
+}
+
+export async function assignPetitions(sessionId, recipientUids) {
+  const snap = await get(ref(db, `sessions/${sessionId}/petitions`))
+  const petitions = snap.val() || {}
+  const valid = recipientUids.filter(uid => petitions[uid])
+  if (valid.length < 2) throw new Error('Se necesitan al menos 2 peticiones para asignar')
+
+  const perm = derangePermutation(valid.length)
+  const assignments = {}
+  for (let i = 0; i < valid.length; i++) {
+    const recipient = valid[i]
+    const source = petitions[valid[perm[i]]]
+    assignments[recipient] = source.anonymous
+      ? { text: source.text, anonymous: true }
+      : { name: source.name, text: source.text, anonymous: false }
+  }
+
+  await set(ref(db, `sessions/${sessionId}/assignments`), assignments)
+  await update(ref(db, `sessions/${sessionId}/meta`), { phase: 'assigned' })
+}
+
+export function subscribePeticionAssignment(sessionId, uid, cb, onError) {
+  const r = ref(db, `sessions/${sessionId}/assignments/${uid}`)
+  onValue(
+    r,
+    snap => cb(snap.val()),
+    err => { console.error('subscribePeticionAssignment error:', err); onError?.(err) }
+  )
+  return () => off(r)
 }

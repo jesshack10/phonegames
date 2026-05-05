@@ -5,7 +5,9 @@ import {
   subscribePeticionesSession,
   subscribePeticionesPlayers,
   subscribePeticiones,
+  subscribePeticionAssignment,
   submitPeticion,
+  assignPetitions,
   deleteSession,
   SESSION_TTL,
 } from '../../firebase/session.js'
@@ -20,7 +22,7 @@ function formatPetitions(petitions) {
   const title = `Peticiones · ${date}`
   const divider = '─'.repeat(Math.max(title.length, 24))
   const body = petitions
-    .map(p => `${p.name}\n${p.text.trim()}`)
+    .map(p => `${p.anonymous ? 'Anónimo' : p.name}\n${p.text.trim()}`)
     .join('\n\n')
   return `${title}\n${divider}\n\n${body}\n`
 }
@@ -32,16 +34,24 @@ export default function PeticionesHost() {
   const [meta, setMeta] = useState(null)
   const [players, setPlayers] = useState([])
   const [petitions, setPetitions] = useState([])
+  const [myAssignment, setMyAssignment] = useState(null)
   const [copied, setCopied] = useState(false)
   const [confirmEnd, setConfirmEnd] = useState(false)
   const [myText, setMyText] = useState('')
+  const [myAnonymous, setMyAnonymous] = useState(false)
   const [submittingMine, setSubmittingMine] = useState(false)
   const [myError, setMyError] = useState('')
+  const [skipNonSubmitters, setSkipNonSubmitters] = useState(false)
+  const [assigning, setAssigning] = useState(false)
+  const [assignError, setAssignError] = useState('')
   const [readError, setReadError] = useState('')
+  const [assignmentCopied, setAssignmentCopied] = useState(false)
   const sessionExistedRef = useRef(false)
 
   const me = players.find(p => p.id === uid)
   const mySubmitted = !!me?.submitted
+  const phase = meta?.phase
+  const isAssigned = phase === 'assigned'
 
   useEffect(() => {
     const onErr = (label) => (err) =>
@@ -51,6 +61,12 @@ export default function PeticionesHost() {
     const u3 = subscribePeticiones(sessionId, setPetitions, onErr('petitions'))
     return () => { u1(); u2(); u3() }
   }, [sessionId])
+
+  useEffect(() => {
+    if (!uid || !isAssigned) return
+    const u = subscribePeticionAssignment(sessionId, uid, setMyAssignment)
+    return () => u()
+  }, [sessionId, uid, isAssigned])
 
   useEffect(() => {
     if (meta) {
@@ -68,6 +84,12 @@ export default function PeticionesHost() {
   const lobbyUrl = `${window.location.origin}${window.location.pathname}#/peticiones/lobby/${sessionId}`
   const submittedCount = players.filter(p => p.submitted).length
   const totalCount = players.length
+  const pending = players.filter(p => !p.submitted)
+  const allSubmitted = totalCount > 0 && submittedCount === totalCount
+  const canAssign =
+    !isAssigned &&
+    submittedCount >= 2 &&
+    (allSubmitted || skipNonSubmitters)
 
   async function handleCopy() {
     if (!formatted) return
@@ -76,7 +98,6 @@ export default function PeticionesHost() {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      // Fallback for older browsers
       const ta = document.createElement('textarea')
       ta.value = formatted
       document.body.appendChild(ta)
@@ -86,6 +107,23 @@ export default function PeticionesHost() {
     }
   }
 
+  async function handleCopyAssignment() {
+    if (!myAssignment) return
+    const author = myAssignment.anonymous ? 'Anónimo' : myAssignment.name
+    const txt = `${author}\n${(myAssignment.text || '').trim()}\n`
+    try {
+      await navigator.clipboard.writeText(txt)
+    } catch {
+      const ta = document.createElement('textarea')
+      ta.value = txt
+      document.body.appendChild(ta)
+      ta.select()
+      try { document.execCommand('copy') } catch {}
+      document.body.removeChild(ta)
+    }
+    setAssignmentCopied(true)
+    setTimeout(() => setAssignmentCopied(false), 2000)
+  }
 
   async function handleEnd() {
     if (!confirmEnd) {
@@ -104,7 +142,7 @@ export default function PeticionesHost() {
     setSubmittingMine(true)
     setMyError('')
     try {
-      await submitPeticion(sessionId, uid, me.name, trimmed)
+      await submitPeticion(sessionId, uid, me.name, trimmed, myAnonymous)
       setMyText('')
     } catch (e) {
       console.error('submitPeticion failed:', e)
@@ -112,6 +150,25 @@ export default function PeticionesHost() {
       setMyError(`Error al enviar: ${code}`)
     } finally {
       setSubmittingMine(false)
+    }
+  }
+
+  async function handleAssign() {
+    if (!canAssign || assigning) return
+    setAssigning(true)
+    setAssignError('')
+    try {
+      const recipients = (skipNonSubmitters
+        ? players.filter(p => p.submitted)
+        : players
+      ).map(p => p.id)
+      await assignPetitions(sessionId, recipients)
+    } catch (e) {
+      console.error('assignPetitions failed:', e)
+      const code = e?.code || e?.message || 'desconocido'
+      setAssignError(`Error al asignar: ${code}`)
+    } finally {
+      setAssigning(false)
     }
   }
 
@@ -137,23 +194,33 @@ export default function PeticionesHost() {
         <h1 className="text-white text-2xl font-black tracking-tight">PETICIONES</h1>
       </div>
 
-      {/* QR + code */}
-      <div className="flex flex-col items-center gap-3 w-full max-w-xs">
-        <div className="bg-white p-3 rounded-2xl shadow-2xl shadow-black/50">
-          <QRCodeSVG value={lobbyUrl} size={160} level="M" includeMargin={false} />
-        </div>
-        <p className="text-white/40 text-xs">Escanea o comparte el enlace</p>
-        <p className="text-white text-3xl font-mono font-bold tracking-widest">{sessionId}</p>
+      {/* QR + share — only while still accepting submissions */}
+      {!isAssigned && (
+        <div className="flex flex-col items-center gap-3 w-full max-w-xs">
+          <div className="bg-white p-3 rounded-2xl shadow-2xl shadow-black/50">
+            <QRCodeSVG value={lobbyUrl} size={160} level="M" includeMargin={false} />
+          </div>
+          <p className="text-white/40 text-xs">Escanea o comparte el enlace</p>
+          <p className="text-white text-3xl font-mono font-bold tracking-widest">{sessionId}</p>
 
-        <ShareSessionLink
-          url={lobbyUrl}
-          shareTitle="Peticiones"
-          shareText={`Únete a la sesión de peticiones (código ${sessionId})`}
-          copyLabel="Copiar enlace"
-          copiedLabel="¡Copiado! ✓"
-          shareLabel="Compartir"
-        />
-      </div>
+          <ShareSessionLink
+            url={lobbyUrl}
+            shareTitle="Peticiones"
+            shareText={`Únete a la sesión de peticiones (código ${sessionId})`}
+            copyLabel="Copiar enlace"
+            copiedLabel="¡Copiado! ✓"
+            shareLabel="Compartir"
+          />
+        </div>
+      )}
+
+      {isAssigned && (
+        <div className="w-full max-w-md bg-blue-500/10 border border-blue-500/30 rounded-2xl px-4 py-3 text-center">
+          <p className="text-blue-300 text-sm font-semibold">
+            🔒 Sesión cerrada · {petitions.length} peticiones asignadas
+          </p>
+        </div>
+      )}
 
       {/* Counter */}
       <div className="text-center">
@@ -188,8 +255,8 @@ export default function PeticionesHost() {
         </div>
       )}
 
-      {/* Mi petición — host's own submission */}
-      {me && !mySubmitted && (
+      {/* Mi petición — host's own submission (only while phase is active) */}
+      {me && !mySubmitted && !isAssigned && (
         <div className="w-full max-w-md flex flex-col gap-2 bg-white/5 border border-white/10 rounded-2xl p-4">
           <p className="text-white/80 text-sm font-semibold">Tu petición</p>
           <textarea
@@ -199,6 +266,15 @@ export default function PeticionesHost() {
             rows={4}
             className="w-full px-3 py-3 rounded-xl bg-white/10 border border-white/20 text-white text-sm placeholder-white/30 outline-none focus:border-blue-500 resize-none leading-relaxed"
           />
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={myAnonymous}
+              onChange={e => setMyAnonymous(e.target.checked)}
+              className="w-4 h-4 accent-blue-500"
+            />
+            <span className="text-white/60 text-xs">Enviar de forma anónima</span>
+          </label>
           {myError && <p className="text-red-400 text-xs">{myError}</p>}
           <button
             onClick={handleSubmitMine}
@@ -209,13 +285,83 @@ export default function PeticionesHost() {
           </button>
         </div>
       )}
-      {me && mySubmitted && (
+      {me && mySubmitted && !isAssigned && (
         <div className="w-full max-w-md flex items-center justify-center gap-2 bg-blue-500/10 border border-blue-500/30 rounded-2xl px-4 py-3">
           <span className="text-blue-300 text-sm font-semibold">✓ Tu petición ya está enviada</span>
         </div>
       )}
 
-      {/* Petitions preview */}
+      {/* Host's assigned petition (after assignment) */}
+      {isAssigned && myAssignment && (
+        <div className="w-full max-w-md flex flex-col gap-3 bg-white/5 border border-white/10 rounded-2xl p-4">
+          <p className="text-white/80 text-sm font-semibold">Tu petición asignada</p>
+          <div className="flex flex-col gap-2">
+            <p className={`text-sm font-bold ${myAssignment.anonymous ? 'text-white/60 italic' : 'text-blue-300'}`}>
+              {myAssignment.anonymous ? 'Anónimo' : myAssignment.name}
+            </p>
+            <p className="text-white/90 text-sm leading-relaxed whitespace-pre-wrap">
+              {myAssignment.text}
+            </p>
+          </div>
+          <button
+            onClick={handleCopyAssignment}
+            className="w-full py-3 rounded-xl bg-blue-500 active:bg-blue-600 text-white text-sm font-bold transition-colors"
+          >
+            {assignmentCopied ? '¡Copiada! ✓' : '📋 Copiar mi petición'}
+          </button>
+        </div>
+      )}
+      {isAssigned && !myAssignment && me && !mySubmitted && (
+        <div className="w-full max-w-md bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-center">
+          <p className="text-white/60 text-sm">No enviaste petición — no recibiste asignación.</p>
+        </div>
+      )}
+
+      {/* Assignment panel — only while still active */}
+      {!isAssigned && (
+        <div className="w-full max-w-md flex flex-col gap-2 bg-white/5 border border-white/10 rounded-2xl p-4">
+          <p className="text-white/80 text-sm font-semibold">Asignar peticiones</p>
+          <p className="text-white/50 text-xs">
+            Cada participante recibirá una petición que no es la suya.
+          </p>
+
+          {!allSubmitted && pending.length > 0 && (
+            <p className="text-white/40 text-xs">
+              Esperando: {pending.map(p => p.name).join(', ')}
+            </p>
+          )}
+
+          {!allSubmitted && (
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={skipNonSubmitters}
+                onChange={e => setSkipNonSubmitters(e.target.checked)}
+                className="w-4 h-4 accent-blue-500"
+              />
+              <span className="text-white/60 text-xs">
+                Asignar sin esperar a quienes no enviaron
+              </span>
+            </label>
+          )}
+
+          {assignError && <p className="text-red-400 text-xs">{assignError}</p>}
+
+          <button
+            onClick={handleAssign}
+            disabled={!canAssign || assigning}
+            className="w-full py-3 rounded-xl bg-blue-500 active:bg-blue-600 text-white text-sm font-bold disabled:opacity-30 transition-colors"
+          >
+            {assigning
+              ? 'Asignando…'
+              : submittedCount < 2
+              ? `Necesitas ${2 - submittedCount} petición más`
+              : `Asignar peticiones (${skipNonSubmitters ? submittedCount : totalCount})`}
+          </button>
+        </div>
+      )}
+
+      {/* Petitions preview (always shown to moderator) */}
       {petitions.length > 0 ? (
         <div className="w-full max-w-md bg-white/5 border border-white/10 rounded-2xl p-4 max-h-80 overflow-y-auto">
           <pre className="text-white/85 text-sm whitespace-pre-wrap font-sans leading-relaxed">
