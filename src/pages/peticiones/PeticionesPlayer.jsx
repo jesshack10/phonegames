@@ -13,7 +13,9 @@ import { useAuth } from '../../hooks/useAuth.js'
 function formatAssignment(a) {
   if (!a) return ''
   const author = a.anonymous ? 'Anónimo' : a.name
-  return `${author}\n${(a.text || '').trim()}\n`
+  const lines = (a.text || '').trim().split('\n').filter(l => l.trim())
+  const bullets = lines.map(l => `• ${l.trim()}`).join('\n')
+  return `###1\nDe: ${author}\n${bullets}\n`
 }
 
 export default function PeticionesPlayer() {
@@ -128,6 +130,20 @@ export default function PeticionesPlayer() {
           <div className="text-6xl">🙏</div>
           <h2 className="text-white text-2xl font-black">Las peticiones ya fueron asignadas</h2>
           <p className="text-white/50 text-sm">No participaste en esta ronda.</p>
+          {players.length > 0 && (
+            <div className="w-full max-w-xs flex flex-col gap-2 mt-2">
+              <p className="text-white/30 text-xs uppercase tracking-widest">En la sala</p>
+              {players.map(p => (
+                <div key={p.id} className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-2.5">
+                  <span className={`text-sm ${p.submitted ? 'text-green-400' : 'text-white/30'}`}>
+                    {p.submitted ? '✓' : '○'}
+                  </span>
+                  <span className="text-white/80 text-sm font-medium">{p.name}</span>
+                  {p.id === uid && <span className="text-white/30 text-xs ml-auto">(tú)</span>}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )
     }
@@ -139,7 +155,7 @@ export default function PeticionesPlayer() {
         </div>
       )
     }
-    const author = assignment.anonymous ? 'Anónimo' : assignment.name
+    const assignmentLines = (assignment.text || '').trim().split('\n').filter(l => l.trim())
     return (
       <div className="min-h-screen bg-[#0a0a18] flex flex-col px-6 py-10 gap-5">
         <div className="flex items-center justify-between">
@@ -157,22 +173,43 @@ export default function PeticionesPlayer() {
         </p>
 
         <div className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 flex flex-col gap-3">
-          <p className={`text-base font-bold ${assignment.anonymous ? 'text-white/60 italic' : 'text-blue-300'}`}>
-            {author}
+          <p className="text-white/25 text-xs font-mono">###1</p>
+          <p className={`text-sm font-bold ${assignment.anonymous ? 'text-white/60 italic' : 'text-blue-300'}`}>
+            De: {assignment.anonymous ? 'Anónimo' : assignment.name}
           </p>
-          <p className="text-white/90 text-base leading-relaxed whitespace-pre-wrap">
-            {assignment.text}
-          </p>
+          <ul className="flex flex-col gap-1">
+            {assignmentLines.map((line, i) => (
+              <li key={i} className="flex gap-2 text-white/90 text-base leading-relaxed">
+                <span className="text-white/30 shrink-0">•</span>
+                <span>{line.trim()}</span>
+              </li>
+            ))}
+          </ul>
         </div>
+
+        {players.length > 0 && (
+          <div className="w-full flex flex-col gap-2">
+            <p className="text-white/30 text-xs uppercase tracking-widest">En la sala</p>
+            {players.map(p => (
+              <div key={p.id} className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-2.5">
+                <span className={`text-sm ${p.submitted ? 'text-green-400' : 'text-white/30'}`}>
+                  {p.submitted ? '✓' : '○'}
+                </span>
+                <span className="text-white/80 text-sm font-medium">{p.name}</span>
+                {p.id === uid && <span className="text-white/30 text-xs ml-auto">(tú)</span>}
+              </div>
+            ))}
+          </div>
+        )}
 
         <button
           onClick={handleCopyAssignment}
-          className="w-full py-4 rounded-2xl bg-blue-500 active:bg-blue-600 text-white text-base font-bold transition-colors"
+          className="w-full py-4 rounded-2xl bg-blue-500 active:bg-blue-600 text-white text-base font-bold transition-colors mt-auto"
         >
           {copied ? '¡Copiada! ✓' : '📋 Copiar petición'}
         </button>
 
-        <p className="text-white/30 text-xs text-center mt-auto">
+        <p className="text-white/30 text-xs text-center">
           Gracias por participar, {myName}.
         </p>
       </div>

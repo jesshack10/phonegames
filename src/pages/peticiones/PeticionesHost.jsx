@@ -114,7 +114,9 @@ export default function PeticionesHost() {
   async function handleCopyAssignment() {
     if (!myAssignment) return
     const author = myAssignment.anonymous ? 'Anónimo' : myAssignment.name
-    const txt = `${author}\n${(myAssignment.text || '').trim()}\n`
+    const lines = (myAssignment.text || '').trim().split('\n').filter(l => l.trim())
+    const bullets = lines.map(l => `• ${l.trim()}`).join('\n')
+    const txt = `###1\nDe: ${author}\n${bullets}\n`
     try {
       await navigator.clipboard.writeText(txt)
     } catch {
@@ -300,12 +302,18 @@ export default function PeticionesHost() {
         <div className="w-full max-w-md flex flex-col gap-3 bg-white/5 border border-white/10 rounded-2xl p-4">
           <p className="text-white/80 text-sm font-semibold">Tu petición asignada</p>
           <div className="flex flex-col gap-2">
+            <p className="text-white/25 text-xs font-mono">###1</p>
             <p className={`text-sm font-bold ${myAssignment.anonymous ? 'text-white/60 italic' : 'text-blue-300'}`}>
-              {myAssignment.anonymous ? 'Anónimo' : myAssignment.name}
+              De: {myAssignment.anonymous ? 'Anónimo' : myAssignment.name}
             </p>
-            <p className="text-white/90 text-sm leading-relaxed whitespace-pre-wrap">
-              {myAssignment.text}
-            </p>
+            <ul className="flex flex-col gap-1">
+              {(myAssignment.text || '').trim().split('\n').filter(l => l.trim()).map((line, i) => (
+                <li key={i} className="flex gap-2 text-white/90 text-sm leading-relaxed">
+                  <span className="text-white/30 shrink-0">•</span>
+                  <span>{line.trim()}</span>
+                </li>
+              ))}
+            </ul>
           </div>
           <button
             onClick={handleCopyAssignment}
