@@ -177,6 +177,7 @@ export default function ImpostorHost() {
           copyLabel={t.copyLink}
           copiedLabel={t.copied}
           shareLabel={t.share}
+          primaryShare
         />
       </div>
 

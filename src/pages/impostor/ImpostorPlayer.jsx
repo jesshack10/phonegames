@@ -145,7 +145,7 @@ export default function ImpostorPlayer() {
     return (
       <div
         className="min-h-screen bg-[#0a0a18] flex flex-col items-center justify-center px-5 text-center cursor-pointer select-none"
-        onClick={() => setRevealed(true)}
+        onClick={() => { navigator.vibrate?.(80); setRevealed(true) }}
       >
         <div className="text-7xl mb-6 animate-pulse">❓</div>
         <h2 className="text-white text-3xl font-black mb-3">{myPlayer.name}</h2>

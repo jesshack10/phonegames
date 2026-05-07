@@ -157,6 +157,11 @@ export default function ImpostorLobby() {
           <div key={p.id} className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3">
             <div className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
             <span className="text-white font-semibold">{p.name}</span>
+            {p.id === uid && (
+              <span className="text-white/30 text-xs ml-auto">
+                {lang === 'es' ? '(tú)' : '(you)'}
+              </span>
+            )}
           </div>
         ))}
       </div>
