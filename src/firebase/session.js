@@ -270,6 +270,21 @@ export async function assignImpostorRoles(sessionId, playerIds, numImpostors, wo
   await update(ref(db), updates)
 }
 
+export async function resetImpostorGame(sessionId, playerIds) {
+  const updates = {
+    [`sessions/${sessionId}/meta/phase`]: 'lobby',
+    [`sessions/${sessionId}/meta/word`]: null,
+  }
+  for (const id of playerIds) {
+    updates[`sessions/${sessionId}/players/${id}/role`] = null
+  }
+  await update(ref(db), updates)
+}
+
+export async function updateImpostorMeta(sessionId, updates) {
+  await update(ref(db, `sessions/${sessionId}/meta`), updates)
+}
+
 // ─── PETICIONES ───────────────────────────────────────────────────────────────
 
 export async function createPeticionesSession(hostId) {

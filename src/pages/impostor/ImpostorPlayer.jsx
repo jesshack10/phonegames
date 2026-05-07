@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { subscribeImpostorSession, subscribeImpostorPlayers, deleteSession, SESSION_TTL } from '../../firebase/session.js'
+import { subscribeImpostorSession, subscribeImpostorPlayers, deleteSession, resetImpostorGame, SESSION_TTL } from '../../firebase/session.js'
 import { useAuth } from '../../hooks/useAuth.js'
 
 const T = {
@@ -27,7 +27,8 @@ const T = {
     ],
     mission: 'Your mission',
     close: 'Close this page after viewing',
-    newGame: 'End game & New game',
+    playAgain: 'Play again',
+    exitGame: 'Exit game',
     loading: 'Loading your role…',
     notInSession: 'You are not part of this game.',
   },
@@ -54,7 +55,8 @@ const T = {
     ],
     mission: 'Tu misión',
     close: 'Cierra esta página después de ver tu rol',
-    newGame: 'Terminar partida y nueva partida',
+    playAgain: 'Jugar de nuevo',
+    exitGame: 'Salir del juego',
     loading: 'Cargando tu rol…',
     notInSession: 'No formas parte de esta partida.',
   },
@@ -67,6 +69,7 @@ export default function ImpostorPlayer() {
   const [meta, setMeta] = useState(null)
   const [players, setPlayers] = useState([])
   const [revealed, setRevealed] = useState(false)
+  const [resetting, setResetting] = useState(false)
   const sessionExistedRef = useRef(false)
 
   const storageKey = `imp_${sessionId}`
@@ -76,12 +79,21 @@ export default function ImpostorPlayer() {
       sessionExistedRef.current = true
       if (meta.phase === 'ended' || Date.now() - meta.createdAt > SESSION_TTL) {
         deleteSession(sessionId).then(() => navigate('/', { replace: true }))
+        return
+      }
+      if (meta.phase === 'lobby') {
+        navigate(
+          uid === meta.hostId
+            ? `/impostor/host/${sessionId}`
+            : `/impostor/lobby/${sessionId}`,
+          { replace: true }
+        )
       }
     } else if (sessionExistedRef.current) {
       localStorage.removeItem(storageKey)
       navigate('/', { replace: true })
     }
-  }, [meta, sessionId, navigate, storageKey])
+  }, [meta, sessionId, navigate, storageKey, uid])
 
   useEffect(() => {
     const u1 = subscribeImpostorSession(sessionId, setMeta)
@@ -99,6 +111,17 @@ export default function ImpostorPlayer() {
   async function handleEndGame() {
     await deleteSession(sessionId)
     navigate('/impostor', { replace: true })
+  }
+
+  async function handlePlayAgain() {
+    if (resetting) return
+    setResetting(true)
+    try {
+      await resetImpostorGame(sessionId, players.map(p => p.id))
+      navigate(`/impostor/host/${sessionId}`, { replace: true })
+    } catch {
+      setResetting(false)
+    }
   }
 
   if (!meta || !uid || players.length === 0) {
@@ -158,12 +181,21 @@ export default function ImpostorPlayer() {
 
         <p className="text-red-900 text-xs mb-6">{t.close}</p>
         {isHost && (
-          <button
-            onClick={handleEndGame}
-            className="w-full max-w-xs py-4 rounded-2xl bg-white/10 active:bg-white/20 text-white font-bold text-base transition-colors"
-          >
-            {t.newGame}
-          </button>
+          <div className="w-full max-w-xs flex flex-col gap-3">
+            <button
+              onClick={handlePlayAgain}
+              disabled={resetting}
+              className="w-full py-4 rounded-2xl bg-indigo-500 active:bg-indigo-600 text-white font-bold text-base transition-colors disabled:opacity-40"
+            >
+              {t.playAgain}
+            </button>
+            <button
+              onClick={handleEndGame}
+              className="w-full py-4 rounded-2xl bg-white/10 active:bg-white/20 text-white font-bold text-base transition-colors"
+            >
+              {t.exitGame}
+            </button>
+          </div>
         )}
       </div>
     )
@@ -196,12 +228,21 @@ export default function ImpostorPlayer() {
 
       <p className="text-green-950 text-xs mb-6">{t.close}</p>
       {isHost && (
-        <button
-          onClick={handleEndGame}
-          className="w-full max-w-xs py-4 rounded-2xl bg-white/10 active:bg-white/20 text-white font-bold text-base transition-colors"
-        >
-          {t.newGame}
-        </button>
+        <div className="w-full max-w-xs flex flex-col gap-3">
+          <button
+            onClick={handlePlayAgain}
+            disabled={resetting}
+            className="w-full py-4 rounded-2xl bg-indigo-500 active:bg-indigo-600 text-white font-bold text-base transition-colors disabled:opacity-40"
+          >
+            {t.playAgain}
+          </button>
+          <button
+            onClick={handleEndGame}
+            className="w-full py-4 rounded-2xl bg-white/10 active:bg-white/20 text-white font-bold text-base transition-colors"
+          >
+            {t.exitGame}
+          </button>
+        </div>
       )}
     </div>
   )
