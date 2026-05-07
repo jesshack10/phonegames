@@ -189,6 +189,22 @@ export default function PeticionesPlayer() {
         <p className="text-white/40 text-sm max-w-xs">
           Espera mientras el moderador asigna las peticiones.
         </p>
+
+        {players.length > 0 && (
+          <div className="w-full max-w-xs flex flex-col gap-2 mt-2">
+            <p className="text-white/30 text-xs uppercase tracking-widest">En la sala</p>
+            {players.map(p => (
+              <div key={p.id} className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-2.5">
+                <span className={`text-sm ${p.submitted ? 'text-green-400' : 'text-white/30'}`}>
+                  {p.submitted ? '✓' : '○'}
+                </span>
+                <span className="text-white/80 text-sm font-medium">{p.name}</span>
+                {p.id === uid && <span className="text-white/30 text-xs ml-auto">(tú)</span>}
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="flex gap-1 mt-2">
           {[0, 1, 2].map(i => (
             <div key={i} className="w-2 h-2 rounded-full bg-white/30 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
@@ -205,6 +221,24 @@ export default function PeticionesPlayer() {
         <p className="text-white/40 text-xs uppercase tracking-widest">{myName}</p>
         <p className="text-white/30 text-xs font-mono">{sessionId}</p>
       </div>
+
+      {players.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {players.map(p => (
+            <div
+              key={p.id}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${
+                p.submitted
+                  ? 'bg-blue-500/20 border-blue-500/40 text-blue-300'
+                  : 'bg-white/5 border-white/10 text-white/50'
+              } ${p.id === uid ? 'ring-1 ring-white/30' : ''}`}
+            >
+              <span>{p.submitted ? '✓' : '○'}</span>
+              <span>{p.name}{p.id === uid ? ' (tú)' : ''}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="flex items-center gap-3">
         <div className="text-4xl">🙏</div>

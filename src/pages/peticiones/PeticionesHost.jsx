@@ -14,17 +14,21 @@ import {
 import { useAuth } from '../../hooks/useAuth.js'
 import ShareSessionLink from '../../components/ShareSessionLink.jsx'
 
-function formatPetitions(petitions) {
-  if (petitions.length === 0) return ''
-  const date = new Date().toLocaleDateString('es', {
+function getDateLabel() {
+  return new Date().toLocaleDateString('es', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   })
-  const title = `Peticiones · ${date}`
-  const divider = '─'.repeat(Math.max(title.length, 24))
-  const body = petitions
-    .map(p => `${p.anonymous ? 'Anónimo' : p.name}\n${p.text.trim()}`)
-    .join('\n\n')
-  return `${title}\n${divider}\n\n${body}\n`
+}
+
+function formatPetitions(petitions) {
+  if (petitions.length === 0) return ''
+  const sections = petitions.map((p, i) => {
+    const author = p.anonymous ? 'Anónimo' : p.name
+    const lines = p.text.trim().split('\n').filter(l => l.trim())
+    const bullets = lines.map(l => `• ${l.trim()}`).join('\n')
+    return `###${i + 1}\nDe: ${author}\n${bullets}`
+  }).join('\n\n')
+  return `Peticiones · ${getDateLabel()}\n\n${sections}\n`
 }
 
 export default function PeticionesHost() {
@@ -363,10 +367,27 @@ export default function PeticionesHost() {
 
       {/* Petitions preview (always shown to moderator) */}
       {petitions.length > 0 ? (
-        <div className="w-full max-w-md bg-white/5 border border-white/10 rounded-2xl p-4 max-h-80 overflow-y-auto">
-          <pre className="text-white/85 text-sm whitespace-pre-wrap font-sans leading-relaxed">
-            {formatted}
-          </pre>
+        <div className="w-full max-w-md bg-white/5 border border-white/10 rounded-2xl p-5 max-h-[28rem] overflow-y-auto flex flex-col gap-1">
+          <p className="text-white/50 text-sm capitalize mb-4">{getDateLabel()}</p>
+          {petitions.map((p, i) => {
+            const lines = p.text.trim().split('\n').filter(l => l.trim())
+            return (
+              <div key={p.id} className={i > 0 ? 'pt-4 border-t border-white/5' : ''}>
+                <p className="text-white/25 text-xs font-mono mb-1">###{i + 1}</p>
+                <p className={`text-sm font-bold mb-2 ${p.anonymous ? 'text-white/50 italic' : 'text-blue-300'}`}>
+                  De: {p.anonymous ? 'Anónimo' : p.name}
+                </p>
+                <ul className="flex flex-col gap-1">
+                  {lines.map((line, j) => (
+                    <li key={j} className="flex gap-2 text-white/80 text-sm leading-relaxed">
+                      <span className="text-white/30 shrink-0">•</span>
+                      <span>{line.trim()}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )
+          })}
         </div>
       ) : (
         <p className="text-white/30 text-sm text-center mt-4">
