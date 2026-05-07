@@ -24,7 +24,7 @@ const T = {
     errName: 'Enter your name',
     errFailed: 'Failed to create game. Try again.',
     orCreate: 'or create a new game',
-    codePh: 'CODE',
+    codePh: 'GAME CODE',
     joinBtn: 'Join →',
     joining: 'Joining…',
     errCodeLen: 'Code must be 6 characters',
@@ -33,6 +33,9 @@ const T = {
     errExpired: 'Session expired',
     errStarted: 'Game already started',
     errJoinFailed: 'Failed to join',
+    joiningCode: (code) => `Joining · ${code}`,
+    newGame: 'New game',
+    back: '← Back',
   },
   es: {
     tagline: 'Encuentra al espía entre ustedes',
@@ -49,13 +52,16 @@ const T = {
     orCreate: 'o crea una nueva partida',
     codePh: 'CÓDIGO',
     joinBtn: 'Unirme →',
-    joining: 'Uniendo…',
+    joining: 'Uniéndose…',
     errCodeLen: 'El código debe tener 6 caracteres',
     errNotFound: 'Sesión no encontrada',
     errWrongGame: 'Ese código no es de Impostor',
     errExpired: 'Sesión expirada',
     errStarted: 'El juego ya comenzó',
     errJoinFailed: 'Error al unirte',
+    joiningCode: (code) => `Uniéndose · ${code}`,
+    newGame: 'Nueva partida',
+    back: '← Atrás',
   },
 }
 
@@ -88,8 +94,8 @@ export default function ImpostorSetup() {
   const [category, setCategory] = useState('Todas')
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
+  const [step, setStep] = useState(null) // null | 'join' | 'create'
   const [loading, setLoading] = useState(false)
-  const [joining, setJoining] = useState(false)
   const [error, setError] = useState('')
 
   const t = T[lang]
@@ -100,10 +106,29 @@ export default function ImpostorSetup() {
     setCategory(T[l].all)
   }
 
+  function handleInitiateJoin() {
+    const normalized = code.trim().toUpperCase()
+    if (normalized.length !== 6) return setError(t.errCodeLen)
+    setCode(normalized)
+    setError('')
+    setStep('join')
+  }
+
+  function handleInitiateCreate() {
+    setError('')
+    setStep('create')
+  }
+
+  function handleBack() {
+    setStep(null)
+    setName('')
+    setError('')
+  }
+
   async function handleCreate() {
     const trimmed = name.trim()
     if (!trimmed) return setError(t.errName)
-    if (!uid || loading || joining) return
+    if (!uid || loading) return
     setLoading(true)
     setError('')
     try {
@@ -121,14 +146,11 @@ export default function ImpostorSetup() {
   async function handleJoin() {
     const trimmed = name.trim()
     if (!trimmed) return setError(t.errName)
-    const normalized = code.trim().toUpperCase()
-    if (normalized.length !== 6) return setError(t.errCodeLen)
-    if (!uid || loading || joining) return
-
-    setJoining(true)
+    if (!uid || loading) return
+    setLoading(true)
     setError('')
     try {
-      const { meta, game } = await lookupSessionGame(normalized)
+      const { meta, game } = await lookupSessionGame(code)
       if (!meta) {
         setError(t.errNotFound)
         return
@@ -138,7 +160,7 @@ export default function ImpostorSetup() {
         return
       }
       if (Date.now() - meta.createdAt > SESSION_TTL) {
-        await deleteSession(normalized)
+        await deleteSession(code)
         setError(t.errExpired)
         return
       }
@@ -146,17 +168,65 @@ export default function ImpostorSetup() {
         setError(t.errStarted)
         return
       }
-      await joinImpostorPlayer(normalized, uid, trimmed, false)
-      localStorage.setItem(`imp_${normalized}`, JSON.stringify({ uid, name: trimmed }))
-      navigate(`/impostor/lobby/${normalized}`, { replace: true })
+      await joinImpostorPlayer(code, uid, trimmed, false)
+      localStorage.setItem(`imp_${code}`, JSON.stringify({ uid, name: trimmed }))
+      navigate(`/impostor/lobby/${code}`, { replace: true })
     } catch (e) {
       console.error('join failed:', e)
       setError(`${t.errJoinFailed}: ${e?.code || e?.message || ''}`)
     } finally {
-      setJoining(false)
+      setLoading(false)
     }
   }
 
+  // ── Name step (join or create) ─────────────────────────────────────────────
+  if (step === 'join' || step === 'create') {
+    const isJoin = step === 'join'
+    return (
+      <div className="min-h-screen bg-[#0a0a18] flex flex-col items-center px-5 py-8 gap-5">
+        <button onClick={handleBack} className="text-white/40 text-sm self-start">
+          {t.back}
+        </button>
+
+        <div className="text-center mt-8">
+          <div className="text-6xl mb-3">🕵️</div>
+          <p className="text-white/40 text-sm tracking-widest uppercase font-mono">
+            {isJoin ? t.joiningCode(code) : t.newGame}
+          </p>
+        </div>
+
+        <div className="w-full max-w-sm flex flex-col gap-3 mt-4">
+          <div className="bg-white/5 rounded-2xl px-5 py-4 border border-white/10">
+            <label className="text-white font-semibold text-lg block mb-3">{t.yourName}</label>
+            <input
+              type="text"
+              value={name}
+              onChange={e => { setName(e.target.value); setError('') }}
+              onKeyDown={e => e.key === 'Enter' && (isJoin ? handleJoin() : handleCreate())}
+              placeholder={t.namePlaceholder}
+              maxLength={16}
+              autoFocus
+              className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white text-lg placeholder-white/30 outline-none focus:border-indigo-500"
+            />
+          </div>
+
+          {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+
+          <button
+            onClick={isJoin ? handleJoin : handleCreate}
+            disabled={!name.trim() || loading || !ready}
+            className="mt-2 w-full bg-red-500 active:bg-red-600 text-white font-black text-xl py-5 rounded-2xl tracking-wide transition-colors shadow-lg shadow-red-500/30 disabled:opacity-40"
+          >
+            {loading
+              ? (isJoin ? t.joining : t.creating)
+              : (isJoin ? t.joinBtn : t.createBtn)}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Main screen ────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#0a0a18] flex flex-col items-center px-5 py-8 gap-5">
       <button
@@ -174,7 +244,6 @@ export default function ImpostorSetup() {
         <p className="text-white/40 mt-2 text-sm tracking-widest uppercase">{t.tagline}</p>
       </div>
 
-      {/* Language toggle */}
       <div className="flex gap-2 bg-white/5 border border-white/10 rounded-2xl p-1.5">
         {['en', 'es'].map(l => (
           <button
@@ -191,42 +260,31 @@ export default function ImpostorSetup() {
       </div>
 
       <div className="w-full max-w-sm flex flex-col gap-3">
-        {/* Host name (shared by both flows) */}
-        <div className="bg-white/5 rounded-2xl px-5 py-4 border border-white/10">
-          <label className="text-white font-semibold text-lg block mb-3">{t.yourName}</label>
-          <input
-            type="text"
-            value={name}
-            onChange={e => { setName(e.target.value); setError('') }}
-            placeholder={t.namePlaceholder}
-            maxLength={16}
-            className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white text-lg placeholder-white/30 outline-none focus:border-indigo-500"
-          />
-        </div>
-
         {/* Join section */}
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2">
           <input
             type="text"
             value={code}
             onChange={e => { setCode(e.target.value.toUpperCase()); setError('') }}
-            onKeyDown={e => e.key === 'Enter' && handleJoin()}
+            onKeyDown={e => e.key === 'Enter' && handleInitiateJoin()}
             placeholder={t.codePh}
             maxLength={6}
             autoCapitalize="characters"
             autoCorrect="off"
             autoComplete="off"
             spellCheck={false}
-            className="flex-1 px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white text-center text-lg font-mono font-bold tracking-widest placeholder-white/30 outline-none focus:border-white/40"
+            className="w-full px-4 py-4 rounded-xl bg-white/10 border border-white/20 text-white text-center text-2xl font-mono font-bold tracking-widest placeholder-white/30 outline-none focus:border-white/40"
           />
           <button
-            onClick={handleJoin}
-            disabled={!ready || !uid || !name.trim() || code.trim().length !== 6 || loading || joining}
-            className="px-5 py-3 rounded-xl bg-white/10 active:bg-white/20 text-white font-bold disabled:opacity-30 transition-colors"
+            onClick={handleInitiateJoin}
+            disabled={code.trim().length !== 6}
+            className="w-full py-4 rounded-xl bg-white/10 active:bg-white/20 text-white font-bold text-base disabled:opacity-30 transition-colors"
           >
-            {joining ? '…' : t.joinBtn}
+            {t.joinBtn}
           </button>
         </div>
+
+        {error && <p className="text-red-400 text-sm text-center">{error}</p>}
 
         {/* Divider */}
         <div className="flex items-center gap-3 mt-2">
@@ -235,7 +293,6 @@ export default function ImpostorSetup() {
           <div className="flex-1 h-px bg-white/10" />
         </div>
 
-        {/* Create config */}
         <Stepper label={t.impostors} value={numImpostors} onChange={setNumImpostors} min={1} max={5} />
 
         <div className="bg-white/5 rounded-2xl px-5 py-4 border border-white/10">
@@ -256,14 +313,12 @@ export default function ImpostorSetup() {
         </div>
 
         <button
-          onClick={handleCreate}
-          disabled={!name.trim() || loading || joining || !ready}
+          onClick={handleInitiateCreate}
+          disabled={loading || !ready}
           className="mt-2 w-full bg-red-500 active:bg-red-600 text-white font-black text-xl py-5 rounded-2xl tracking-wide transition-colors shadow-lg shadow-red-500/30 disabled:opacity-40"
         >
-          {!ready ? t.connecting : loading ? t.creating : t.createBtn}
+          {!ready ? t.connecting : t.createBtn}
         </button>
-
-        {error && <p className="text-red-400 text-sm text-center">{error}</p>}
       </div>
     </div>
   )
