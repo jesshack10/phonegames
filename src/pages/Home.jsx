@@ -27,6 +27,15 @@ export default function Home() {
       >
         🙏 Peticiones
       </button>
+
+      <div className="w-full max-w-xs h-px bg-white/10 my-2" />
+
+      <button
+        onClick={() => navigate('/money')}
+        className="w-full max-w-xs py-6 rounded-2xl bg-gradient-to-br from-emerald-700 to-emerald-950 border border-emerald-500 text-white text-2xl font-bold tracking-wide shadow-lg active:scale-95 transition-transform"
+      >
+        💰 Money Manager
+      </button>
     </div>
   )
 }

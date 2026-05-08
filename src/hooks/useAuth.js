@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { onAuthStateChanged } from 'firebase/auth'
+import { onAuthStateChanged, signInAnonymously } from 'firebase/auth'
 import { auth } from '../firebase/config.js'
 
 export function useAuth() {
@@ -11,9 +11,18 @@ export function useAuth() {
       setReady(true)
       return
     }
-    const unsub = onAuthStateChanged(auth, (user) => {
-      setUid(user?.uid ?? null)
-      setReady(true)
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setUid(user.uid)
+        setReady(true)
+      } else {
+        try {
+          await signInAnonymously(auth)
+        } catch (e) {
+          console.warn('Anon auth failed:', e)
+          setReady(true)
+        }
+      }
     })
     return unsub
   }, [])

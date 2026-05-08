@@ -12,6 +12,11 @@ import PeticionesSetup from './pages/peticiones/PeticionesSetup.jsx'
 import PeticionesHost from './pages/peticiones/PeticionesHost.jsx'
 import PeticionesLobby from './pages/peticiones/PeticionesLobby.jsx'
 import PeticionesPlayer from './pages/peticiones/PeticionesPlayer.jsx'
+import MoneyDashboard from './pages/money/MoneyDashboard.jsx'
+import AddExpense from './pages/money/AddExpense.jsx'
+import ExpenseHistory from './pages/money/ExpenseHistory.jsx'
+import ManageAccounts from './pages/money/ManageAccounts.jsx'
+import ManageCategories from './pages/money/ManageCategories.jsx'
 
 export default function App() {
   return (
@@ -30,6 +35,11 @@ export default function App() {
         <Route path="/peticiones/host/:sessionId" element={<PeticionesHost />} />
         <Route path="/peticiones/lobby/:sessionId" element={<PeticionesLobby />} />
         <Route path="/peticiones/play/:sessionId" element={<PeticionesPlayer />} />
+        <Route path="/money" element={<MoneyDashboard />} />
+        <Route path="/money/add" element={<AddExpense />} />
+        <Route path="/money/history" element={<ExpenseHistory />} />
+        <Route path="/money/accounts" element={<ManageAccounts />} />
+        <Route path="/money/categories" element={<ManageCategories />} />
       </Routes>
     </HashRouter>
   )
