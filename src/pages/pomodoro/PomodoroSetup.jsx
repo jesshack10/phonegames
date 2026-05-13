@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom'
 
 const ANIMATIONS = [
   { id: 'hourglass', emoji: '⏳', label: 'Hourglass' },
-  { id: 'painting', emoji: '🎨', label: 'Painting' },
-  { id: 'plant', emoji: '🌱', label: 'Plant' },
+  { id: 'painting',  emoji: '🎨', label: 'Painting' },
+  { id: 'plant',     emoji: '🌱', label: 'Plant' },
+  { id: 'brain',     emoji: '🧠', label: 'Brain' },
 ]
 
 function Counter({ label, value, onDec, onInc, color, unit }) {
@@ -99,15 +100,15 @@ export default function PomodoroSetup() {
         </div>
       </section>
 
-      {/* Animation picker */}
+      {/* Animation picker — 4 columns */}
       <section className="flex flex-col gap-2.5">
         <label className="text-[10px] text-gray-500 uppercase tracking-[0.2em]">Visual Feedback</label>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-4 gap-2">
           {ANIMATIONS.map(a => (
             <button
               key={a.id}
               onClick={() => setAnimation(a.id)}
-              className={`flex flex-col items-center gap-2 py-5 rounded-xl border transition-all active:scale-95 ${
+              className={`flex flex-col items-center gap-2 py-4 rounded-xl border transition-all active:scale-95 ${
                 animation === a.id
                   ? 'border-amber-500/50 bg-amber-500/10 text-amber-300'
                   : 'border-gray-800 bg-[#10102a] text-gray-500'
