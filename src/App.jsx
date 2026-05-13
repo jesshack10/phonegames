@@ -12,6 +12,8 @@ import PeticionesSetup from './pages/peticiones/PeticionesSetup.jsx'
 import PeticionesHost from './pages/peticiones/PeticionesHost.jsx'
 import PeticionesLobby from './pages/peticiones/PeticionesLobby.jsx'
 import PeticionesPlayer from './pages/peticiones/PeticionesPlayer.jsx'
+import PomodoroSetup from './pages/pomodoro/PomodoroSetup.jsx'
+import PomodoroTimer from './pages/pomodoro/PomodoroTimer.jsx'
 
 export default function App() {
   return (
@@ -30,6 +32,8 @@ export default function App() {
         <Route path="/peticiones/host/:sessionId" element={<PeticionesHost />} />
         <Route path="/peticiones/lobby/:sessionId" element={<PeticionesLobby />} />
         <Route path="/peticiones/play/:sessionId" element={<PeticionesPlayer />} />
+        <Route path="/pomodoro" element={<PomodoroSetup />} />
+        <Route path="/pomodoro/timer" element={<PomodoroTimer />} />
       </Routes>
     </HashRouter>
   )
