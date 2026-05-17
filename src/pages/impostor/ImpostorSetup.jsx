@@ -25,6 +25,7 @@ const T = {
     creating: 'Creating…',
     errName: 'Enter your name',
     errFailed: 'Failed to create game. Try again.',
+    errNoFirebase: 'Firebase not configured — add secrets to GitHub Actions',
     orCreate: 'or create a new game',
     joinBtn: 'Join →',
     joining: 'Joining…',
@@ -50,6 +51,7 @@ const T = {
     creating: 'Creando…',
     errName: 'Escribe tu nombre',
     errFailed: 'Error al crear la partida. Intenta de nuevo.',
+    errNoFirebase: 'Firebase no configurado — agrega los secrets en GitHub Actions',
     orCreate: 'o crea una nueva partida',
     joinBtn: 'Unirme →',
     joining: 'Uniéndose…',
@@ -149,6 +151,7 @@ export default function ImpostorSetup() {
   const t = T[lang]
   const categoryNames = getCategoryNames(lang)
   const codeReady = code.length === 6
+  const firebaseReady = ready && !!uid
 
   useEffect(() => {
     const saved = localStorage.getItem(SETTINGS_KEY)
@@ -191,7 +194,8 @@ export default function ImpostorSetup() {
   async function handleCreate() {
     const trimmed = name.trim()
     if (!trimmed) return setError(t.errName)
-    if (!uid || loading) return
+    if (!uid) return setError(t.errNoFirebase)
+    if (loading) return
     setLoading(true)
     setError('')
     try {
@@ -210,7 +214,8 @@ export default function ImpostorSetup() {
   async function handleJoin() {
     const trimmed = name.trim()
     if (!trimmed) return setError(t.errName)
-    if (!uid || loading) return
+    if (!uid) return setError(t.errNoFirebase)
+    if (loading) return
     setLoading(true)
     setError('')
     try {
@@ -261,15 +266,22 @@ export default function ImpostorSetup() {
               className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white text-lg placeholder-white/30 outline-none focus:border-indigo-500"
             />
           </div>
+          {ready && !uid && (
+            <p className="text-amber-400 text-sm text-center">⚠ {t.errNoFirebase}</p>
+          )}
           {error && <p className="text-red-400 text-sm text-center">{error}</p>}
           <button
             onClick={isJoin ? handleJoin : handleCreate}
-            disabled={!name.trim() || loading || !ready}
+            disabled={!name.trim() || loading || !ready || !uid}
             className="mt-2 w-full bg-red-500 active:bg-red-600 text-white font-black text-xl py-5 rounded-2xl tracking-wide transition-colors shadow-lg shadow-red-500/30 disabled:opacity-40"
           >
-            {loading
-              ? (isJoin ? t.joining : t.creating)
-              : (isJoin ? t.joinBtn : t.createBtn)}
+            {!ready
+              ? t.connecting
+              : !uid
+                ? t.errNoFirebase
+                : loading
+                  ? (isJoin ? t.joining : t.creating)
+                  : (isJoin ? t.joinBtn : t.createBtn)}
           </button>
         </div>
       </div>
@@ -342,10 +354,10 @@ export default function ImpostorSetup() {
         </div>
         <button
           onClick={handleInitiateCreate}
-          disabled={loading || !ready}
+          disabled={loading || !ready || !firebaseReady}
           className="mt-2 w-full bg-red-500 active:bg-red-600 text-white font-black text-xl py-5 rounded-2xl tracking-wide transition-colors shadow-lg shadow-red-500/30 disabled:opacity-40"
         >
-          {!ready ? t.connecting : t.createBtn}
+          {!ready ? t.connecting : !uid ? t.errNoFirebase : t.createBtn}
         </button>
       </div>
     </div>

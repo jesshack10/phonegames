@@ -5,7 +5,7 @@ import { auth } from './firebase/config.js'
 import './index.css'
 import App from './App.jsx'
 
-if (auth) signInAnonymously(auth).catch(() => {})
+if (auth) signInAnonymously(auth).catch(e => console.error('Anonymous sign-in failed:', e))
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

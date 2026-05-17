@@ -35,6 +35,7 @@ export default function PeticionesSetup() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const codeReady = code.length === 6
+  const noFirebase = ready && !uid
 
   function handleInitiateJoin() {
     if (!codeReady) return setError('El código debe tener 6 caracteres')
@@ -49,7 +50,8 @@ export default function PeticionesSetup() {
     const trimmed = name.trim()
     if (!trimmed) return setError('Escribe tu nombre')
     if (trimmed.length > 24) return setError('Nombre muy largo (máx 24)')
-    if (!uid || loading) return
+    if (!uid) return setError('Firebase no configurado — agrega los secrets en GitHub Actions')
+    if (loading) return
     setLoading(true); setError('')
     try {
       const sessionId = await createPeticionesSession(uid)
@@ -64,7 +66,8 @@ export default function PeticionesSetup() {
     const trimmed = name.trim()
     if (!trimmed) return setError('Escribe tu nombre')
     if (trimmed.length > 24) return setError('Nombre muy largo (máx 24)')
-    if (!uid || loading) return
+    if (!uid) return setError('Firebase no configurado — agrega los secrets en GitHub Actions')
+    if (loading) return
     setLoading(true); setError('')
     try {
       const { meta, game } = await lookupSessionGame(code)
@@ -89,9 +92,12 @@ export default function PeticionesSetup() {
         </div>
         <div className="w-full max-w-sm flex flex-col gap-4 mt-2">
           <input type="text" placeholder="Tu nombre…" value={name} onChange={e => { setName(e.target.value); setError('') }} onKeyDown={e => e.key === 'Enter' && (isJoin ? handleJoin() : handleCreate())} maxLength={24} autoFocus className="w-full px-4 py-4 rounded-xl bg-white/10 border border-white/20 text-white text-lg placeholder-white/30 outline-none focus:border-blue-500" />
+          {noFirebase && (
+            <p className="text-amber-400 text-sm text-center">⚠ Firebase no configurado — agrega los secrets en GitHub Actions</p>
+          )}
           {error && <p className="text-red-400 text-sm text-center">{error}</p>}
-          <button onClick={isJoin ? handleJoin : handleCreate} disabled={!name.trim() || loading || !ready} className="w-full py-5 rounded-2xl bg-blue-500 active:bg-blue-600 text-white font-black text-xl tracking-wide shadow-lg shadow-blue-500/20 disabled:opacity-40 transition-colors">
-            {loading ? (isJoin ? 'Uniéndose…' : 'Creando…') : (isJoin ? 'Unirme →' : 'Crear sesión →')}
+          <button onClick={isJoin ? handleJoin : handleCreate} disabled={!name.trim() || loading || !ready || !uid} className="w-full py-5 rounded-2xl bg-blue-500 active:bg-blue-600 text-white font-black text-xl tracking-wide shadow-lg shadow-blue-500/20 disabled:opacity-40 transition-colors">
+            {!ready ? 'Conectando…' : !uid ? 'Firebase no configurado' : loading ? (isJoin ? 'Uniéndose…' : 'Creando…') : (isJoin ? 'Unirme →' : 'Crear sesión →')}
           </button>
         </div>
       </div>
@@ -113,7 +119,9 @@ export default function PeticionesSetup() {
         </div>
         {error && <p className="text-red-400 text-sm text-center">{error}</p>}
         <div className="flex items-center gap-3"><div className="flex-1 h-px bg-white/10" /><p className="text-white/30 text-xs uppercase tracking-widest">o crea una nueva sesión</p><div className="flex-1 h-px bg-white/10" /></div>
-        <button onClick={handleInitiateCreate} disabled={loading || !ready} className="w-full py-5 rounded-2xl bg-blue-500 active:bg-blue-600 text-white font-black text-xl tracking-wide shadow-lg shadow-blue-500/20 disabled:opacity-40 transition-colors">{!ready ? 'Conectando…' : 'Crear sesión →'}</button>
+        <button onClick={handleInitiateCreate} disabled={loading || !ready || !uid} className="w-full py-5 rounded-2xl bg-blue-500 active:bg-blue-600 text-white font-black text-xl tracking-wide shadow-lg shadow-blue-500/20 disabled:opacity-40 transition-colors">
+          {!ready ? 'Conectando…' : !uid ? 'Firebase no configurado' : 'Crear sesión →'}
+        </button>
       </div>
     </div>
   )
