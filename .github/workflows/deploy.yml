@@ -27,6 +27,9 @@ jobs:
 
       - run: npm run build
 
+      - name: List build output
+        run: find dist -type f | sort
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
