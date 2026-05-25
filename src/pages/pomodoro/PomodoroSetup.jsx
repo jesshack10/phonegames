@@ -1,13 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-const ANIMATIONS = [
-  { id: 'hourglass', emoji: '⏳', label: 'Hourglass' },
-  { id: 'painting',  emoji: '🎨', label: 'Painting' },
-  { id: 'plant',     emoji: '🌱', label: 'Plant' },
-  { id: 'brain',     emoji: '🧠', label: 'Brain' },
-]
-
 function Counter({ label, value, onDec, onInc, color, unit }) {
   return (
     <div className="flex flex-col items-center gap-1 flex-1 bg-[#10102a] rounded-xl py-4 px-2 border border-gray-800">
@@ -28,21 +21,19 @@ function Counter({ label, value, onDec, onInc, color, unit }) {
 
 export default function PomodoroSetup() {
   const navigate = useNavigate()
-  const [intention, setIntention] = useState('')
-  const [description, setDescription] = useState('')
-  const [workMinutes, setWorkMinutes] = useState(25)
+  const [intention,    setIntention]    = useState('')
+  const [description,  setDescription]  = useState('')
+  const [workMinutes,  setWorkMinutes]  = useState(25)
   const [breakMinutes, setBreakMinutes] = useState(5)
-  const [sessions, setSessions] = useState(4)
-  const [animation, setAnimation] = useState('hourglass')
+  const [sessions,     setSessions]     = useState(4)
 
   function start() {
     const params = new URLSearchParams({
-      intention: intention.trim() || 'Focus',
+      intention:    intention.trim() || 'Focus',
       description,
-      workMinutes: String(workMinutes),
+      workMinutes:  String(workMinutes),
       breakMinutes: String(breakMinutes),
-      sessions: String(sessions),
-      animation,
+      sessions:     String(sessions),
     })
     navigate(`/pomodoro/timer?${params.toString()}`)
   }
@@ -95,26 +86,6 @@ export default function PomodoroSetup() {
             onInc={() => setSessions(s => Math.min(12, s + 1))}
             color="text-violet-400" unit="×"
           />
-        </div>
-      </section>
-
-      <section className="flex flex-col gap-2.5">
-        <label className="text-[10px] text-gray-500 uppercase tracking-[0.2em]">Visual Feedback</label>
-        <div className="grid grid-cols-4 gap-2">
-          {ANIMATIONS.map(a => (
-            <button
-              key={a.id}
-              onClick={() => setAnimation(a.id)}
-              className={`flex flex-col items-center gap-2 py-4 rounded-xl border transition-all active:scale-95 ${
-                animation === a.id
-                  ? 'border-amber-500/50 bg-amber-500/10 text-amber-300'
-                  : 'border-gray-800 bg-[#10102a] text-gray-500'
-              }`}
-            >
-              <span className="text-3xl">{a.emoji}</span>
-              <span className="text-xs">{a.label}</span>
-            </button>
-          ))}
         </div>
       </section>
 
