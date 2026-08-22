@@ -1,5 +1,52 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { VISUALS } from '../../components/pomodoro/visualTheme'
+
+const STORE_KEY = 'pomodoro-visual'
+
+function readStoredVisual() {
+  try {
+    const saved = localStorage.getItem(STORE_KEY)
+    if (VISUALS.some(v => v.id === saved)) return saved
+  } catch { /* private mode or storage disabled */ }
+  return 'halo'
+}
+
+// Small still frames of each visual at roughly two thirds through a session,
+// so the picker shows what the screen will actually look like.
+function VisualPreview({ id }) {
+  if (id === 'dial') {
+    return (
+      <svg viewBox="0 0 60 60" width="56" height="56">
+        <rect x="1" y="1" width="58" height="58" rx="9" fill="#0a0a18" />
+        {Array.from({ length: 16 }).map((_, i) => {
+          const a = (i / 16) * Math.PI * 2 - Math.PI / 2
+          return (
+            <line key={i}
+              x1={30 + Math.cos(a) * 17} y1={30 + Math.sin(a) * 17}
+              x2={30 + Math.cos(a) * 22} y2={30 + Math.sin(a) * 22}
+              stroke={i < 6 ? 'rgba(246,242,234,0.12)' : 'rgba(246,242,234,0.8)'}
+              strokeWidth="2" strokeLinecap="round" />
+          )
+        })}
+        <circle cx="30" cy="30" r="14" fill="none" stroke="#f0563a" strokeWidth="1.6"
+          pathLength="100" strokeDasharray="62 100" transform="rotate(-90 30 30)" strokeLinecap="round" />
+      </svg>
+    )
+  }
+  return (
+    <svg viewBox="0 0 60 60" width="56" height="56">
+      <rect x="1" y="1" width="58" height="58" rx="9" fill="#0a0a18" />
+      <rect x="6" y="6" width="48" height="48" rx="7" fill="none"
+        stroke="rgba(255,255,255,0.08)" strokeWidth="2" />
+      <rect x="6" y="6" width="48" height="48" rx="7" fill="none"
+        stroke="#ffd9a0" strokeWidth="2.4" strokeLinecap="round"
+        pathLength="100" strokeDasharray="62 100" />
+      <text x="30" y="34" textAnchor="middle" fill="#f6f2ea"
+        fontSize="12" fontFamily="monospace">17</text>
+    </svg>
+  )
+}
 
 function Counter({ label, value, onDec, onInc, color, unit }) {
   return (
@@ -26,6 +73,7 @@ export default function PomodoroSetup() {
   const [workMinutes,  setWorkMinutes]  = useState(25)
   const [breakMinutes, setBreakMinutes] = useState(5)
   const [sessions,     setSessions]     = useState(4)
+  const [visual,       setVisual]       = useState(readStoredVisual)
 
   function start() {
     const params = new URLSearchParams({
@@ -34,7 +82,9 @@ export default function PomodoroSetup() {
       workMinutes:  String(workMinutes),
       breakMinutes: String(breakMinutes),
       sessions:     String(sessions),
+      visual,
     })
+    try { localStorage.setItem(STORE_KEY, visual) } catch { /* nothing to do */ }
     navigate(`/pomodoro/timer?${params.toString()}`)
   }
 
@@ -86,6 +136,32 @@ export default function PomodoroSetup() {
             onInc={() => setSessions(s => Math.min(12, s + 1))}
             color="text-violet-400" unit="×"
           />
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-2.5">
+        <label className="text-[10px] text-gray-500 uppercase tracking-[0.2em]">View</label>
+        <div className="grid grid-cols-2 gap-3">
+          {VISUALS.map(v => (
+            <button
+              key={v.id}
+              onClick={() => setVisual(v.id)}
+              aria-pressed={visual === v.id}
+              className={`flex items-center gap-3 py-3 px-4 rounded-xl border transition-all active:scale-95 ${
+                visual === v.id
+                  ? 'border-amber-500/50 bg-amber-500/10 text-amber-300'
+                  : 'border-gray-800 bg-[#10102a] text-gray-500'
+              }`}
+            >
+              <VisualPreview id={v.id} />
+              <span className="flex flex-col items-start leading-tight">
+                <span className="text-sm">{v.label}</span>
+                <span className="text-[10px] text-gray-600">
+                  {v.id === 'halo' ? 'edge light' : 'minute ticks'}
+                </span>
+              </span>
+            </button>
+          ))}
         </div>
       </section>
 

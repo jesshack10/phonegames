@@ -1,5 +1,53 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import useBoxSize from '../../components/pomodoro/useBoxSize'
+import useWakeLock from '../../components/pomodoro/useWakeLock'
+import HaloVisual from '../../components/pomodoro/HaloVisual'
+import DialVisual from '../../components/pomodoro/DialVisual'
+import { VISUALS, getTheme } from '../../components/pomodoro/visualTheme'
+
+const STORE_KEY = 'pomodoro-visual'
+
+function readStoredVisual() {
+  try {
+    const saved = localStorage.getItem(STORE_KEY)
+    if (VISUALS.some(v => v.id === saved)) return saved
+  } catch { /* private mode or storage disabled */ }
+  return null
+}
+
+function storeVisual(id) {
+  try { localStorage.setItem(STORE_KEY, id) } catch { /* nothing to do */ }
+}
+
+// Halo can push the clock as large as the screen allows, since nothing else
+// occupies the middle. Dial instead takes the room left over between the
+// intention and the controls, and sizes its digits from what it measures — a
+// short landscape screen leaves far less than viewport maths would assume.
+const HALO_DIGITS = { normal: 'min(28vw, 34vh)', full: 'min(32vw, 52vh)' }
+const DIAL_DIGIT_RATIO = 0.22
+
+function HaloIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round">
+      <path d="M12 3 H18 A3 3 0 0 1 21 6 V18 A3 3 0 0 1 18 21 H6 A3 3 0 0 1 3 18 V6 A3 3 0 0 1 6 3 Z"
+        opacity="0.3" />
+      <path d="M12 3 H18 A3 3 0 0 1 21 6 V15" />
+    </svg>
+  )
+}
+
+function DialIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round">
+      <circle cx="12" cy="12" r="7.5" opacity="0.35" />
+      <path d="M12 2.2 V4.6 M21.8 12 H19.4 M12 21.8 V19.4 M2.2 12 H4.6" />
+      <path d="M12 7.5 V12 L15 14" />
+    </svg>
+  )
+}
 
 export default function PomodoroTimer() {
   const navigate = useNavigate()
@@ -11,18 +59,36 @@ export default function PomodoroTimer() {
   const breakSecs   = Number(searchParams.get('breakMinutes') || 5)  * 60
   const totalSessions = Number(searchParams.get('sessions') || 4)
 
+  const requested = searchParams.get('visual')
+  const initialVisual = VISUALS.some(v => v.id === requested)
+    ? requested
+    : readStoredVisual() || 'halo'
+
   const [phase,    setPhase]    = useState('work')
   const [session,  setSession]  = useState(1)
   const [timeLeft, setTimeLeft] = useState(workSecs)
   const [running,  setRunning]  = useState(false)
   const [done,     setDone]     = useState(false)
   const [fsMode,   setFsMode]   = useState(false)
+  const [visual,   setVisual]   = useState(initialVisual)
 
   const intervalRef  = useRef(null)
   const phaseRef     = useRef('work')
   const sessionRef   = useRef(1)
 
   const isWork = phase === 'work'
+  const totalTime = isWork ? workSecs : breakSecs
+  const remaining = Math.max(0, Math.min(1, timeLeft / totalTime))
+  const t = getTheme(visual, phase)
+  useWakeLock(running)
+  const [dialRef, dialBox] = useBoxSize()
+  // The ring is inscribed in its box, so the smaller side sets the clock size.
+  const dialDigits = Math.round(Math.min(dialBox.w, dialBox.h) * DIAL_DIGIT_RATIO)
+
+  function pickVisual(id) {
+    setVisual(id)
+    storeVisual(id)
+  }
 
   function startNextPhase() {
     const cp = phaseRef.current, cs = sessionRef.current
@@ -64,30 +130,67 @@ export default function PomodoroTimer() {
 
   const min = String(Math.floor(timeLeft / 60)).padStart(2, '0')
   const sec = String(timeLeft % 60).padStart(2, '0')
+  const minutesLeft = Math.ceil(timeLeft / 60)
 
-  const clockColor  = isWork ? 'text-white'      : 'text-teal-200'
-  const labelColor  = isWork ? 'text-amber-400/40' : 'text-teal-400/40'
-  const btnBorder   = isWork ? 'border-amber-500/50' : 'border-teal-500/50'
-  const btnBg       = isWork ? 'bg-amber-500/10'    : 'bg-teal-500/10'
-  const btnText     = isWork ? 'text-amber-300'     : 'text-teal-300'
+  const phaseLabel = isWork ? `focus · ${session} of ${totalSessions}` : 'rest · breathe'
+
+  // ── CLOCK ───────────────────────────────────────────────────────────────
+  // Dial keeps the digits inside its ring; Halo lets them run as big as the
+  // screen allows because nothing else occupies the middle.
+  const clock = visual === 'dial' ? (
+    <div
+      ref={dialRef}
+      className="relative w-full flex items-center justify-center min-h-0"
+      style={fsMode
+        ? { width: 'min(96vw, 84vh)', height: 'min(96vw, 84vh)' }
+        // Square, so the ring fills its box and the phase label above it stays
+        // attached to the dial instead of drifting up towards the dots.
+        : { flex: '1 1 0', aspectRatio: '1', maxWidth: '92vw', maxHeight: '92vw' }}
+    >
+      <DialVisual
+        remaining={remaining}
+        totalSeconds={totalTime}
+        tickOn={t.tickOn}
+        tickOff={t.tickOff}
+        accent={t.accent}
+      />
+      <div className="relative flex flex-col items-center"
+        style={{ gap: Math.max(4, dialDigits * 0.11) }}>
+        <div className="font-mono font-bold tabular-nums leading-none tracking-tight"
+          style={{ fontSize: dialDigits, color: t.digits }}>
+          {min}<span style={{ color: t.colon }}>:</span>{sec}
+        </div>
+        <span className="uppercase tracking-[0.3em]"
+          style={{ fontSize: Math.max(9, dialDigits * 0.14), color: t.label }}>
+          {minutesLeft} min
+        </span>
+      </div>
+    </div>
+  ) : (
+    <div className="font-mono font-bold tabular-nums leading-none tracking-tight"
+      style={{ fontSize: HALO_DIGITS[fsMode ? 'full' : 'normal'], color: t.digits }}>
+      {min}<span style={{ color: t.colon }}>:</span>{sec}
+    </div>
+  )
 
   // ── FULLSCREEN ──────────────────────────────────────────────────────────
   if (fsMode) {
     return (
       <div
-        className={`fixed inset-0 z-50 bg-[#0a0a18] flex flex-col items-center justify-center select-none`}
+        className="fixed inset-0 z-50 flex flex-col items-center justify-center select-none"
+        style={{ background: t.bg }}
         onClick={() => setFsMode(false)}
       >
-        <span className={`text-[0.55rem] uppercase tracking-[0.4em] mb-5 ${labelColor}`}>
-          {isWork ? `focus · ${session} of ${totalSessions}` : 'rest · breathe'}
+        {visual === 'halo' && (
+          <HaloVisual remaining={remaining} color={t.accent} track={t.track} thick />
+        )}
+        <span className="relative text-[0.55rem] uppercase tracking-[0.4em] mb-5"
+          style={{ color: t.label }}>
+          {phaseLabel}
         </span>
-        <div
-          className={`font-mono font-bold tabular-nums leading-none tracking-tight ${clockColor}`}
-          style={{ fontSize: 'min(32vw, 52vh)' }}
-        >
-          {min}<span className="opacity-25">:</span>{sec}
-        </div>
-        <span className="absolute bottom-6 text-white/15 text-[0.6rem] tracking-widest uppercase">
+        <div className="relative">{clock}</div>
+        <span className="absolute bottom-6 text-[0.6rem] tracking-widest uppercase"
+          style={{ color: t.ghost }}>
           tap anywhere to exit
         </span>
       </div>
@@ -97,33 +200,41 @@ export default function PomodoroTimer() {
   // ── DONE ────────────────────────────────────────────────────────────────
   if (done) {
     return (
-      <div className="min-h-screen bg-[#0a0a18] flex flex-col items-center justify-center gap-5 text-white px-6">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-5 px-6"
+        style={{ background: t.bg, color: t.digits }}>
         <div className="text-6xl">🌟</div>
-        <h2 className="text-3xl font-bold text-amber-400">All done!</h2>
-        <p className="text-gray-500 text-center">{totalSessions} sessions complete</p>
-        {intention && <p className="text-gray-700 text-sm italic text-center max-w-xs">{intention}</p>}
+        <h2 className="text-3xl font-bold" style={{ color: t.accent }}>All done!</h2>
+        <p style={{ color: t.label }}>{totalSessions} sessions complete</p>
+        {intention && (
+          <p className="text-sm italic text-center max-w-xs" style={{ color: t.ghost }}>{intention}</p>
+        )}
         <button onClick={reset}
-          className="px-10 py-4 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-700 border border-amber-400/40 font-bold text-xl active:scale-95 transition-transform mt-3">
+          className="px-10 py-4 rounded-2xl border-2 font-bold text-xl active:scale-95 transition-transform mt-3"
+          style={{ borderColor: t.ctlBorder, background: t.ctlBg, color: t.ctlText }}>
           Go again
         </button>
-        <button onClick={() => navigate('/pomodoro')} className="text-gray-700 text-sm mt-1">← New session</button>
+        <button onClick={() => navigate('/pomodoro')} className="text-sm mt-1"
+          style={{ color: t.label }}>← New session</button>
       </div>
     )
   }
 
   // ── DOTS ────────────────────────────────────────────────────────────────
   const dots = (
-    <div className="flex gap-2.5">
-      {Array.from({ length: totalSessions }).map((_, i) => (
-        <div key={i} className={`rounded-full transition-all duration-700 ${
-          i < session - 1
-            ? 'w-2.5 h-2.5 bg-amber-500/50'
-            : i === session - 1
-              ? isWork ? 'w-3.5 h-3.5 bg-amber-400 shadow-[0_0_12px_#f59e0b80]'
-                       : 'w-3.5 h-3.5 bg-teal-400 shadow-[0_0_12px_#2dd4bf80]'
-              : 'w-2.5 h-2.5 bg-gray-800'
-        }`} />
-      ))}
+    <div className="flex gap-2.5 items-center">
+      {Array.from({ length: totalSessions }).map((_, i) => {
+        const isPast = i < session - 1
+        const isNow  = i === session - 1
+        const d = isNow ? 14 : 10
+        return (
+          <div key={i} className="rounded-full transition-all duration-700"
+            style={{
+              width: d, height: d,
+              background: isPast ? t.dotPast : isNow ? t.dotNow : t.dotNext,
+              boxShadow: isNow ? `0 0 12px ${t.dotNow}80` : 'none',
+            }} />
+        )
+      })}
     </div>
   )
 
@@ -136,55 +247,80 @@ export default function PomodoroTimer() {
     </svg>
   )
 
+  const iconBtn = 'w-10 h-10 rounded-full flex items-center justify-center transition-opacity'
+
   // ── NORMAL LAYOUT ───────────────────────────────────────────────────────
   return (
-    <div className="relative bg-[#0a0a18] select-none overflow-hidden
+    <div className="relative select-none overflow-hidden
       flex flex-col items-center justify-between
-      min-h-screen py-10 landscape:py-3">
+      min-h-screen py-10 landscape:py-3"
+      style={{ background: t.bg }}>
 
-      {/* Ghost intention */}
-      <div className="absolute top-2 left-0 right-0 text-center opacity-[0.07] pointer-events-none z-10">
-        <p className="text-sm text-white tracking-[0.2em] uppercase font-light">{intention}</p>
-        {description && <p className="text-xs text-gray-300 mt-1">{description}</p>}
+      {visual === 'halo' && (
+        <HaloVisual remaining={remaining} color={t.accent} track={t.track} />
+      )}
+
+      {/* Top: whispered intention, then session dots. In flow rather than
+          absolute so a two-line intention can never sit on top of the dots. */}
+      <div className="flex flex-col items-center gap-3 px-6 mt-2 landscape:mt-0 z-10">
+        <div className="text-center pointer-events-none">
+          <p className="text-sm tracking-[0.2em] uppercase font-light" style={{ color: t.ghost }}>
+            {intention}
+          </p>
+          {description && (
+            <p className="text-xs mt-1 landscape:hidden" style={{ color: t.ghost }}>
+              {description}
+            </p>
+          )}
+        </div>
+        {dots}
       </div>
 
-      {/* Top: session dots */}
-      <div className="mt-4 landscape:mt-0 z-10">{dots}</div>
-
       {/* Center: clock */}
-      <div className="flex flex-col items-center gap-3 flex-1 justify-center z-10">
-        <span className={`text-[0.6rem] uppercase tracking-[0.4em] ${labelColor}`}>
-          {isWork ? `focus · ${session} of ${totalSessions}` : 'rest · breathe'}
+      <div className="flex flex-col items-center gap-3 flex-1 min-h-0 w-full justify-center z-10">
+        <span className="text-[0.6rem] uppercase tracking-[0.4em]" style={{ color: t.label }}>
+          {phaseLabel}
         </span>
-        <div
-          className={`font-mono font-bold tabular-nums leading-none tracking-tight ${clockColor}`}
-          style={{ fontSize: 'min(28vw, 38vh)' }}
-        >
-          {min}<span className="opacity-30">:</span>{sec}
-        </div>
+        {clock}
       </div>
 
       {/* Bottom: controls */}
       <div className="flex flex-col items-center gap-3 pb-2 z-10">
         <button
           onClick={() => setRunning(r => !r)}
-          className={`w-[72px] h-[72px] rounded-full flex items-center justify-center text-2xl
-            active:scale-90 transition-all border-2 ${btnBorder} ${btnBg} ${btnText}`}
+          aria-label={running ? 'Pause' : 'Start'}
+          className="w-[72px] h-[72px] rounded-full flex items-center justify-center text-2xl
+            active:scale-90 transition-all border-2"
+          style={{ borderColor: t.ctlBorder, background: t.ctlBg, color: t.ctlText }}
         >
           {running ? '⏸' : '▶'}
         </button>
+
         <div className="flex items-center gap-1">
-          <button onClick={() => setFsMode(true)}
-            aria-label="Fullscreen"
-            className="w-10 h-10 rounded-full text-white flex items-center justify-center opacity-20 hover:opacity-60 active:opacity-80 transition-opacity">
+          {/* Visual mode */}
+          <button onClick={() => pickVisual('halo')}
+            aria-label="Halo view" aria-pressed={visual === 'halo'}
+            className={iconBtn}
+            style={{ color: t.icon, opacity: visual === 'halo' ? 0.85 : 0.2 }}>
+            <HaloIcon />
+          </button>
+          <button onClick={() => pickVisual('dial')}
+            aria-label="Dial view" aria-pressed={visual === 'dial'}
+            className={iconBtn}
+            style={{ color: t.icon, opacity: visual === 'dial' ? 0.85 : 0.2 }}>
+            <DialIcon />
+          </button>
+
+          <div className="w-px h-5 mx-1.5" style={{ background: t.ghost }} />
+
+          <button onClick={() => setFsMode(true)} aria-label="Fullscreen"
+            className={iconBtn} style={{ color: t.icon, opacity: 0.2 }}>
             <ExpandIcon />
           </button>
-          <button onClick={reset}
-            aria-label="Reset"
-            className="w-10 h-10 rounded-full text-white text-lg flex items-center justify-center opacity-20 hover:opacity-60 active:opacity-80 transition-opacity">↺</button>
-          <button onClick={() => navigate('/pomodoro')}
-            aria-label="Exit"
-            className="w-10 h-10 rounded-full text-white text-lg flex items-center justify-center opacity-20 hover:opacity-60 active:opacity-80 transition-opacity">✕</button>
+          <button onClick={reset} aria-label="Reset"
+            className={`${iconBtn} text-lg`} style={{ color: t.icon, opacity: 0.2 }}>↺</button>
+          <button onClick={() => navigate('/pomodoro')} aria-label="Exit"
+            className={`${iconBtn} text-lg`} style={{ color: t.icon, opacity: 0.2 }}>✕</button>
         </div>
       </div>
     </div>
