@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import useBoxSize from '../../components/pomodoro/useBoxSize'
+import useWakeLock from '../../components/pomodoro/useWakeLock'
 import HaloVisual from '../../components/pomodoro/HaloVisual'
 import DialVisual from '../../components/pomodoro/DialVisual'
 import { VISUALS, getTheme } from '../../components/pomodoro/visualTheme'
@@ -79,6 +80,7 @@ export default function PomodoroTimer() {
   const totalTime = isWork ? workSecs : breakSecs
   const remaining = Math.max(0, Math.min(1, timeLeft / totalTime))
   const t = getTheme(visual, phase)
+  useWakeLock(running)
   const [dialRef, dialBox] = useBoxSize()
   // The ring is inscribed in its box, so the smaller side sets the clock size.
   const dialDigits = Math.round(Math.min(dialBox.w, dialBox.h) * DIAL_DIGIT_RATIO)
