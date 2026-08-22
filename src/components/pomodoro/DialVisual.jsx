@@ -6,7 +6,7 @@
 // block stays at exactly one tick per minute.
 const STEPS = [60, 30, 15, 10, 5]
 
-export default function DialVisual({ remaining, totalSeconds, size, tickOn, tickOff, accent }) {
+export default function DialVisual({ remaining, totalSeconds, tickOn, tickOff, accent }) {
   const step = STEPS.find(s => totalSeconds / s >= 12) || STEPS[STEPS.length - 1]
   const count = Math.min(90, Math.max(1, Math.round(totalSeconds / step)))
   const spent = Math.min(count - 1, Math.floor((1 - remaining) * count))
@@ -35,9 +35,7 @@ export default function DialVisual({ remaining, totalSeconds, size, tickOn, tick
   return (
     <svg
       viewBox="0 0 200 200"
-      width={size}
-      height={size}
-      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+      className="absolute inset-0 w-full h-full pointer-events-none"
       aria-hidden="true"
     >
       {/* rotated so minute zero sits at twelve o'clock */}

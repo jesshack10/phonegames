@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import useBoxSize from '../../components/pomodoro/useBoxSize'
 import HaloVisual from '../../components/pomodoro/HaloVisual'
 import DialVisual from '../../components/pomodoro/DialVisual'
 import { VISUALS, getTheme } from '../../components/pomodoro/visualTheme'
@@ -18,18 +19,12 @@ function storeVisual(id) {
   try { localStorage.setItem(STORE_KEY, id) } catch { /* nothing to do */ }
 }
 
-// Digit and dial sizing per visual. Halo can push the clock as large as the
-// screen allows; Dial has to leave room for the ring around it.
-const SIZES = {
-  halo: {
-    normal: { digits: 'min(28vw, 38vh)' },
-    full:   { digits: 'min(32vw, 52vh)' },
-  },
-  dial: {
-    normal: { dial: 'min(92vw, 62vh)', digits: 'min(20.2vw, 13.6vh)' },
-    full:   { dial: 'min(96vw, 84vh)', digits: 'min(21.1vw, 18.5vh)' },
-  },
-}
+// Halo can push the clock as large as the screen allows, since nothing else
+// occupies the middle. Dial instead takes the room left over between the
+// intention and the controls, and sizes its digits from what it measures — a
+// short landscape screen leaves far less than viewport maths would assume.
+const HALO_DIGITS = { normal: 'min(28vw, 34vh)', full: 'min(32vw, 52vh)' }
+const DIAL_DIGIT_RATIO = 0.22
 
 function HaloIcon() {
   return (
@@ -84,7 +79,9 @@ export default function PomodoroTimer() {
   const totalTime = isWork ? workSecs : breakSecs
   const remaining = Math.max(0, Math.min(1, timeLeft / totalTime))
   const t = getTheme(visual, phase)
-  const size = SIZES[visual][fsMode ? 'full' : 'normal']
+  const [dialRef, dialBox] = useBoxSize()
+  // The ring is inscribed in its box, so the smaller side sets the clock size.
+  const dialDigits = Math.round(Math.min(dialBox.w, dialBox.h) * DIAL_DIGIT_RATIO)
 
   function pickVisual(id) {
     setVisual(id)
@@ -139,29 +136,37 @@ export default function PomodoroTimer() {
   // Dial keeps the digits inside its ring; Halo lets them run as big as the
   // screen allows because nothing else occupies the middle.
   const clock = visual === 'dial' ? (
-    <div className="relative flex items-center justify-center"
-      style={{ width: size.dial, height: size.dial }}>
+    <div
+      ref={dialRef}
+      className="relative w-full flex items-center justify-center min-h-0"
+      style={fsMode
+        ? { width: 'min(96vw, 84vh)', height: 'min(96vw, 84vh)' }
+        // Square, so the ring fills its box and the phase label above it stays
+        // attached to the dial instead of drifting up towards the dots.
+        : { flex: '1 1 0', aspectRatio: '1', maxWidth: '92vw', maxHeight: '92vw' }}
+    >
       <DialVisual
         remaining={remaining}
         totalSeconds={totalTime}
-        size="100%"
         tickOn={t.tickOn}
         tickOff={t.tickOff}
         accent={t.accent}
       />
-      <div className="relative flex flex-col items-center gap-2">
+      <div className="relative flex flex-col items-center"
+        style={{ gap: Math.max(4, dialDigits * 0.11) }}>
         <div className="font-mono font-bold tabular-nums leading-none tracking-tight"
-          style={{ fontSize: size.digits, color: t.digits }}>
+          style={{ fontSize: dialDigits, color: t.digits }}>
           {min}<span style={{ color: t.colon }}>:</span>{sec}
         </div>
-        <span className="text-[0.6rem] uppercase tracking-[0.3em]" style={{ color: t.label }}>
+        <span className="uppercase tracking-[0.3em]"
+          style={{ fontSize: Math.max(9, dialDigits * 0.14), color: t.label }}>
           {minutesLeft} min
         </span>
       </div>
     </div>
   ) : (
     <div className="font-mono font-bold tabular-nums leading-none tracking-tight"
-      style={{ fontSize: size.digits, color: t.digits }}>
+      style={{ fontSize: HALO_DIGITS[fsMode ? 'full' : 'normal'], color: t.digits }}>
       {min}<span style={{ color: t.colon }}>:</span>{sec}
     </div>
   )
@@ -253,21 +258,24 @@ export default function PomodoroTimer() {
         <HaloVisual remaining={remaining} color={t.accent} track={t.track} />
       )}
 
-      {/* Ghost intention */}
-      <div className="absolute top-5 left-0 right-0 text-center pointer-events-none z-10">
-        <p className="text-sm tracking-[0.2em] uppercase font-light" style={{ color: t.ghost }}>
-          {intention}
-        </p>
-        {description && (
-          <p className="text-xs mt-1" style={{ color: t.ghost }}>{description}</p>
-        )}
+      {/* Top: whispered intention, then session dots. In flow rather than
+          absolute so a two-line intention can never sit on top of the dots. */}
+      <div className="flex flex-col items-center gap-3 px-6 mt-2 landscape:mt-0 z-10">
+        <div className="text-center pointer-events-none">
+          <p className="text-sm tracking-[0.2em] uppercase font-light" style={{ color: t.ghost }}>
+            {intention}
+          </p>
+          {description && (
+            <p className="text-xs mt-1 landscape:hidden" style={{ color: t.ghost }}>
+              {description}
+            </p>
+          )}
+        </div>
+        {dots}
       </div>
 
-      {/* Top: session dots */}
-      <div className="mt-4 landscape:mt-0 z-10">{dots}</div>
-
       {/* Center: clock */}
-      <div className="flex flex-col items-center gap-3 flex-1 justify-center z-10">
+      <div className="flex flex-col items-center gap-3 flex-1 min-h-0 w-full justify-center z-10">
         <span className="text-[0.6rem] uppercase tracking-[0.4em]" style={{ color: t.label }}>
           {phaseLabel}
         </span>

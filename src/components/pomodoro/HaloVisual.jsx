@@ -1,25 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import useBoxSize from './useBoxSize'
 
 // A light that traces the edge of the screen and retracts as the phase runs
 // down. The path is measured in pixels rather than drawn in a viewBox so the
 // stroke keeps an even weight on any screen shape.
 export default function HaloVisual({ remaining, color, track, thick = false }) {
-  const ref = useRef(null)
-  const [box, setBox] = useState({ w: 0, h: 0 })
-
-  useEffect(() => {
-    const node = ref.current
-    if (!node) return
-    const measure = () => setBox({ w: node.clientWidth, h: node.clientHeight })
-    measure()
-    if (typeof ResizeObserver === 'undefined') {
-      window.addEventListener('resize', measure)
-      return () => window.removeEventListener('resize', measure)
-    }
-    const ro = new ResizeObserver(measure)
-    ro.observe(node)
-    return () => ro.disconnect()
-  }, [])
+  const [ref, box] = useBoxSize()
 
   const { w, h } = box
   const inset = thick ? 14 : 11

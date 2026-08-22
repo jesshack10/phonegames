@@ -18,17 +18,18 @@ function VisualPreview({ id }) {
   if (id === 'dial') {
     return (
       <svg viewBox="0 0 60 60" width="56" height="56">
-        <rect x="1" y="1" width="58" height="58" rx="9" fill="#f2f0e9" />
+        <rect x="1" y="1" width="58" height="58" rx="9" fill="#0a0a18" />
         {Array.from({ length: 16 }).map((_, i) => {
           const a = (i / 16) * Math.PI * 2 - Math.PI / 2
           return (
             <line key={i}
               x1={30 + Math.cos(a) * 17} y1={30 + Math.sin(a) * 17}
               x2={30 + Math.cos(a) * 22} y2={30 + Math.sin(a) * 22}
-              stroke={i < 6 ? '#d6d2c7' : '#2b2c29'} strokeWidth="2" strokeLinecap="round" />
+              stroke={i < 6 ? 'rgba(246,242,234,0.12)' : 'rgba(246,242,234,0.8)'}
+              strokeWidth="2" strokeLinecap="round" />
           )
         })}
-        <circle cx="30" cy="30" r="14" fill="none" stroke="#c9331c" strokeWidth="1.6"
+        <circle cx="30" cy="30" r="14" fill="none" stroke="#f0563a" strokeWidth="1.6"
           pathLength="100" strokeDasharray="62 100" transform="rotate(-90 30 30)" strokeLinecap="round" />
       </svg>
     )
