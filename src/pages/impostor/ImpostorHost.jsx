@@ -158,14 +158,17 @@ export default function ImpostorHost() {
   return (
     <div className="min-h-screen bg-[#0a0a18] flex flex-col items-center px-6 py-10 gap-6">
       <h2 className="text-white text-2xl font-bold">{t.waiting}</h2>
+
       <div className="bg-white p-4 rounded-2xl shadow-2xl shadow-black/50">
         <QRCodeSVG value={lobbyUrl} size={200} level="M" includeMargin={false} />
       </div>
+
       <div className="text-center">
         <p className="text-white/40 text-xs mb-1">{t.scanToJoin}</p>
         <p className="text-white/30 text-xs mb-3">{t.code}</p>
         <p className="text-white text-3xl font-mono font-bold tracking-widest">{sessionId}</p>
       </div>
+
       <div className="w-full max-w-xs">
         <ShareSessionLink
           url={lobbyUrl}
@@ -177,6 +180,7 @@ export default function ImpostorHost() {
           primaryShare
         />
       </div>
+
       <div className="w-full max-w-xs">
         <p className="text-white/40 text-xs uppercase tracking-widest mb-3 text-center">{t.inRoom(players.length)}</p>
         <div className="flex flex-col gap-2">
@@ -191,9 +195,18 @@ export default function ImpostorHost() {
           ))}
         </div>
       </div>
+
       <div className="w-full max-w-xs flex flex-col gap-3">
         <p className="text-white/40 text-xs uppercase tracking-widest text-center">{t.settings}</p>
-        <Stepper label={t.impostors} value={numImpostors} onChange={handleNumImpostorsChange} min={1} max={5} />
+
+        <Stepper
+          label={t.impostors}
+          value={numImpostors}
+          onChange={handleNumImpostorsChange}
+          min={1}
+          max={5}
+        />
+
         <div className="bg-white/5 rounded-2xl px-5 py-4 border border-white/10">
           <p className="text-white/60 text-sm font-semibold mb-3">{t.category}</p>
           <div className="flex flex-wrap gap-2">
@@ -211,9 +224,11 @@ export default function ImpostorHost() {
           </div>
         </div>
       </div>
+
       {!canStart && (
         <p className="text-white/40 text-sm text-center">{t.needMore(numImpostors)}</p>
       )}
+
       <button
         onClick={handleAssignRoles}
         disabled={!canStart || loading}
@@ -221,6 +236,7 @@ export default function ImpostorHost() {
       >
         {loading ? t.assigning : t.assignBtn}
       </button>
+
       <button
         onClick={handleExitGame}
         className="w-full max-w-xs py-4 rounded-2xl bg-white/10 active:bg-white/20 text-white font-bold text-base transition-colors"

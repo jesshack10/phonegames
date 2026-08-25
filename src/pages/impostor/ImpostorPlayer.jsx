@@ -140,6 +140,7 @@ export default function ImpostorPlayer() {
     )
   }
 
+  // ── Tap to reveal ──────────────────────────────────────────────────────────
   if (!revealed) {
     return (
       <div
@@ -156,15 +157,19 @@ export default function ImpostorPlayer() {
     )
   }
 
+  // ── Impostor ───────────────────────────────────────────────────────────────
   if (isImpostor) {
     return (
       <div className="min-h-screen bg-red-950 flex flex-col items-center justify-center px-5 text-center">
         <div className="text-7xl mb-6">🕵️</div>
         <div className="bg-red-500/20 border border-red-500/30 rounded-3xl px-8 py-8 max-w-xs w-full mb-6">
-          <p className="text-red-300 text-sm font-semibold uppercase tracking-widest mb-3">{t.yourRole}</p>
+          <p className="text-red-300 text-sm font-semibold uppercase tracking-widest mb-3">
+            {t.yourRole}
+          </p>
           <h1 className="text-4xl font-black text-red-400 mb-1">{t.impostor}</h1>
           <p className="text-red-300/60 text-sm mt-3">{t.impostorNote}</p>
         </div>
+
         <div className="bg-white/5 border border-white/10 rounded-2xl px-5 py-4 max-w-xs w-full text-left mb-6">
           <p className="text-white/60 text-sm font-semibold mb-2">{t.mission}</p>
           <ul className="text-white/40 text-sm space-y-1.5">
@@ -173,22 +178,37 @@ export default function ImpostorPlayer() {
             ))}
           </ul>
         </div>
+
         <p className="text-red-900 text-xs mb-6">{t.close}</p>
         {isHost && (
           <div className="w-full max-w-xs flex flex-col gap-3">
-            <button onClick={handlePlayAgain} disabled={resetting} className="w-full py-4 rounded-2xl bg-indigo-500 active:bg-indigo-600 text-white font-bold text-base transition-colors disabled:opacity-40">{t.playAgain}</button>
-            <button onClick={handleEndGame} className="w-full py-4 rounded-2xl bg-white/10 active:bg-white/20 text-white font-bold text-base transition-colors">{t.exitGame}</button>
+            <button
+              onClick={handlePlayAgain}
+              disabled={resetting}
+              className="w-full py-4 rounded-2xl bg-indigo-500 active:bg-indigo-600 text-white font-bold text-base transition-colors disabled:opacity-40"
+            >
+              {t.playAgain}
+            </button>
+            <button
+              onClick={handleEndGame}
+              className="w-full py-4 rounded-2xl bg-white/10 active:bg-white/20 text-white font-bold text-base transition-colors"
+            >
+              {t.exitGame}
+            </button>
           </div>
         )}
       </div>
     )
   }
 
+  // ── Crewmate ───────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#071a0f] flex flex-col items-center justify-center px-5 text-center">
       <div className="text-7xl mb-6">✅</div>
       <div className="bg-green-500/20 border border-green-500/30 rounded-3xl px-8 py-8 max-w-xs w-full mb-6">
-        <p className="text-green-300 text-sm font-semibold uppercase tracking-widest mb-3">{t.yourRole}</p>
+        <p className="text-green-300 text-sm font-semibold uppercase tracking-widest mb-3">
+          {t.yourRole}
+        </p>
         <h1 className="text-xl font-black text-green-400 mb-4">{t.crewmate}</h1>
         <div className="bg-white/10 rounded-2xl px-6 py-5 mb-3">
           <p className="text-white/50 text-xs uppercase tracking-widest mb-2">{t.secretWord}</p>
@@ -196,6 +216,7 @@ export default function ImpostorPlayer() {
         </div>
         <p className="text-green-300/60 text-sm mt-1">{t.crewmateNote(numImpostors)}</p>
       </div>
+
       <div className="bg-white/5 border border-white/10 rounded-2xl px-5 py-4 max-w-xs w-full text-left mb-6">
         <p className="text-white/60 text-sm font-semibold mb-2">{t.mission}</p>
         <ul className="text-white/40 text-sm space-y-1.5">
@@ -204,11 +225,23 @@ export default function ImpostorPlayer() {
           ))}
         </ul>
       </div>
+
       <p className="text-green-950 text-xs mb-6">{t.close}</p>
       {isHost && (
         <div className="w-full max-w-xs flex flex-col gap-3">
-          <button onClick={handlePlayAgain} disabled={resetting} className="w-full py-4 rounded-2xl bg-indigo-500 active:bg-indigo-600 text-white font-bold text-base transition-colors disabled:opacity-40">{t.playAgain}</button>
-          <button onClick={handleEndGame} className="w-full py-4 rounded-2xl bg-white/10 active:bg-white/20 text-white font-bold text-base transition-colors">{t.exitGame}</button>
+          <button
+            onClick={handlePlayAgain}
+            disabled={resetting}
+            className="w-full py-4 rounded-2xl bg-indigo-500 active:bg-indigo-600 text-white font-bold text-base transition-colors disabled:opacity-40"
+          >
+            {t.playAgain}
+          </button>
+          <button
+            onClick={handleEndGame}
+            className="w-full py-4 rounded-2xl bg-white/10 active:bg-white/20 text-white font-bold text-base transition-colors"
+          >
+            {t.exitGame}
+          </button>
         </div>
       )}
     </div>

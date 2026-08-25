@@ -9,8 +9,8 @@ function shuffle(arr) {
   return a
 }
 
-export function generateGame(numPlayers, numImpostors, category) {
-  const word = getRandomWord(category)
+export function generateGame(numPlayers, numImpostors, category, lang) {
+  const word = getRandomWord(category, lang)
   const roles = shuffle([
     ...Array(numImpostors).fill('impostor'),
     ...Array(numPlayers - numImpostors).fill('crewmate'),
@@ -18,28 +18,30 @@ export function generateGame(numPlayers, numImpostors, category) {
   return { word, roles }
 }
 
-export function buildRevealURL(playerIndex, role, word, numPlayers, numImpostors) {
+export function buildRevealURL(playerIndex, role, word, numPlayers, numImpostors, lang) {
   const data = {
     p: playerIndex + 1,
     t: numPlayers,
     n: numImpostors,
     r: role === 'crewmate' ? 'c' : 'i',
+    l: lang,
     ...(role === 'crewmate' && { w: word }),
   }
-  const encoded = btoa(JSON.stringify(data))
+  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data))))
   const base = `${window.location.origin}${window.location.pathname}`
   return `${base}#/reveal?d=${encodeURIComponent(encoded)}`
 }
 
 export function decodeRevealData(encoded) {
   try {
-    const { p, t, n, r, w } = JSON.parse(atob(decodeURIComponent(encoded)))
+    const { p, t, n, r, w, l } = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(encoded)))))
     return {
       playerNum: p,
       totalPlayers: t,
       numImpostors: n,
       role: r === 'c' ? 'crewmate' : 'impostor',
       word: w ?? null,
+      lang: l ?? 'en',
     }
   } catch {
     return null

@@ -51,12 +51,14 @@ export default function ImpostorLobby() {
 
   const storageKey = `imp_${sessionId}`
 
+  // Fetch lang from meta on mount (before joining) so join screen is in the right language
   useEffect(() => {
     getImpostorMeta(sessionId).then(m => {
       if (m) setLang(m.lang ?? 'es')
     })
   }, [sessionId])
 
+  // Check if already joined from a previous visit
   useEffect(() => {
     if (!uid) return
     const stored = localStorage.getItem(storageKey)
@@ -66,6 +68,7 @@ export default function ImpostorLobby() {
     }
   }, [uid, storageKey])
 
+  // Subscribe once joined
   useEffect(() => {
     if (!joined) return
     const u1 = subscribeImpostorSession(sessionId, setMeta)
@@ -73,6 +76,7 @@ export default function ImpostorLobby() {
     return () => { u1(); u2() }
   }, [joined, sessionId])
 
+  // Navigate when host assigns roles, session expired, or session was deleted
   useEffect(() => {
     if (meta) {
       sessionExistedRef.current = true
@@ -118,6 +122,7 @@ export default function ImpostorLobby() {
           IMPOS<span className="text-red-500">TOR</span>
         </h1>
         <p className="text-white/30 text-sm font-mono tracking-widest">{sessionId}</p>
+
         <div className="w-full max-w-xs flex flex-col gap-3">
           <input
             type="text"
@@ -146,6 +151,7 @@ export default function ImpostorLobby() {
       <div className="text-5xl mt-10">🕵️</div>
       <h2 className="text-white text-2xl font-bold text-center">{t.waiting}</h2>
       <p className="text-white/40 text-sm">{t.inRoom(players.length)}</p>
+
       <div className="w-full max-w-xs flex flex-col gap-2">
         {players.map(p => (
           <div key={p.id} className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3">
@@ -159,6 +165,7 @@ export default function ImpostorLobby() {
           </div>
         ))}
       </div>
+
       <div className="flex gap-1 mt-4">
         {[0, 1, 2].map(i => (
           <div

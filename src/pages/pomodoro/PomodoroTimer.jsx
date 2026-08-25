@@ -5,8 +5,13 @@ import useWakeLock from '../../components/pomodoro/useWakeLock'
 import HaloVisual from '../../components/pomodoro/HaloVisual'
 import DialVisual from '../../components/pomodoro/DialVisual'
 import { VISUALS, getTheme } from '../../components/pomodoro/visualTheme'
+import SessionNoteSheet from '../../components/pomodoro/SessionNoteSheet'
+import { add as addEntry, listTags, newId } from '../../utils/journalStore'
 
 const STORE_KEY = 'pomodoro-visual'
+
+// Below this, an abandoned block isn't worth journalling.
+const MIN_RECORDED_SECONDS = 60
 
 function readStoredVisual() {
   try {
@@ -53,11 +58,14 @@ export default function PomodoroTimer() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
+  const mode        = searchParams.get('mode') === 'block' ? 'block' : 'pomodoro'
+  const isBlock     = mode === 'block'
   const intention   = searchParams.get('intention') || 'Focus'
   const description = searchParams.get('description') || ''
-  const workSecs    = Number(searchParams.get('workMinutes')  || 25) * 60
+  const workMinutes = Number(searchParams.get('workMinutes') || 25)
+  const workSecs    = workMinutes * 60
   const breakSecs   = Number(searchParams.get('breakMinutes') || 5)  * 60
-  const totalSessions = Number(searchParams.get('sessions') || 4)
+  const totalSessions = isBlock ? 1 : Number(searchParams.get('sessions') || 4)
 
   const requested = searchParams.get('visual')
   const initialVisual = VISUALS.some(v => v.id === requested)
@@ -71,10 +79,18 @@ export default function PomodoroTimer() {
   const [done,     setDone]     = useState(false)
   const [fsMode,   setFsMode]   = useState(false)
   const [visual,   setVisual]   = useState(initialVisual)
+  const [draft,    setDraft]    = useState(null)
+  const [tags]                  = useState(() => listTags())
 
   const intervalRef  = useRef(null)
   const phaseRef     = useRef('work')
   const sessionRef   = useRef(1)
+  const deadlineRef  = useRef(0)
+  // Wall-clock start of the focus block under way, set the first time it runs;
+  // null while the block hasn't been started yet.
+  const blockStartRef   = useRef(null)
+  // What to do once the note sheet is dismissed.
+  const pendingActionRef = useRef(null)
 
   const isWork = phase === 'work'
   const totalTime = isWork ? workSecs : breakSecs
@@ -92,6 +108,7 @@ export default function PomodoroTimer() {
 
   function startNextPhase() {
     const cp = phaseRef.current, cs = sessionRef.current
+    blockStartRef.current = null
     if (cp === 'work') {
       if (cs >= totalSessions) { setDone(true); return }
       phaseRef.current = 'break'; setPhase('break'); setTimeLeft(breakSecs)
@@ -103,36 +120,128 @@ export default function PomodoroTimer() {
     setTimeout(() => setRunning(true), 900)
   }
 
+  /**
+   * The countdown is derived from a wall-clock deadline rather than a
+   * decremented counter: iOS throttles timers in a backgrounded PWA, so a
+   * counter would drift and the journal would record the wrong duration.
+   */
   useEffect(() => {
-    if (running) {
-      intervalRef.current = setInterval(() => {
-        setTimeLeft(prev => {
-          if (prev <= 1) {
-            clearInterval(intervalRef.current)
-            intervalRef.current = null
-            setTimeout(() => { setRunning(false); startNextPhase() }, 0)
-            return 0
-          }
-          return prev - 1
-        })
-      }, 1000)
-    } else {
-      if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
+    if (!running) return
+
+    deadlineRef.current = Date.now() + timeLeft * 1000
+    if (phaseRef.current === 'work' && blockStartRef.current == null) {
+      blockStartRef.current = Date.now()
     }
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
+
+    function tick() {
+      const left = Math.max(0, Math.round((deadlineRef.current - Date.now()) / 1000))
+      setTimeLeft(left)
+      if (left === 0) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+        setRunning(false)
+        handlePhaseEnd()
+      }
+    }
+
+    intervalRef.current = setInterval(tick, 250)
+    // Catch up the moment the app comes back to the foreground.
+    document.addEventListener('visibilitychange', tick)
+
+    return () => {
+      if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
+      document.removeEventListener('visibilitychange', tick)
+    }
+    // timeLeft is read once, when the timer starts — re-running every tick
+    // would keep pushing the deadline out.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running])
+
+  function buildDraft(completed) {
+    const startedAt = blockStartRef.current ?? Date.now()
+    // On a natural finish the block ended at its deadline, not whenever a
+    // suspended tab happened to wake up.
+    const endedAt = completed
+      ? Math.min(Date.now(), deadlineRef.current || Date.now())
+      : Date.now()
+    return {
+      startedAt,
+      endedAt,
+      plannedMinutes: workMinutes,
+      actualMinutes: Math.max(1, Math.round((endedAt - startedAt) / 60000)),
+      mode,
+      intention,
+      completed,
+    }
+  }
+
+  /** A focus block just ran out. Breaks are not journalled, so they pass through. */
+  function handlePhaseEnd() {
+    if (phaseRef.current === 'break') { startNextPhase(); return }
+    const lastSession = sessionRef.current >= totalSessions
+    pendingActionRef.current = isBlock ? 'exit' : lastSession ? 'done' : 'next'
+    // The sheet needs the keyboard and the controls, so drop out of fullscreen.
+    setFsMode(false)
+    setDraft(buildDraft(true))
+  }
+
+  function commitDraft(note, tag) {
+    if (draft) addEntry({ id: newId(), ...draft, note: note || '', tag: tag || '' })
+    setDraft(null)
+    const action = pendingActionRef.current
+    pendingActionRef.current = null
+    if (action === 'next') startNextPhase()
+    else if (action === 'done') setDone(true)
+    else if (action === 'reset') reset()
+    else if (action === 'exit') navigate('/pomodoro')
+  }
+
+  /** Elapsed seconds in the focus block currently under way. */
+  function elapsedSeconds() {
+    if (phaseRef.current !== 'work' || blockStartRef.current == null) return 0
+    return (Date.now() - blockStartRef.current) / 1000
+  }
+
+  /**
+   * Leaving mid-block still counts as time spent — capture it rather than
+   * letting it vanish from the journal.
+   */
+  function leave(action) {
+    if (elapsedSeconds() >= MIN_RECORDED_SECONDS) {
+      setRunning(false)
+      pendingActionRef.current = action
+      setFsMode(false)
+      setDraft(buildDraft(false))
+      return
+    }
+    if (action === 'reset') reset()
+    else navigate('/pomodoro')
+  }
 
   function reset() {
     if (intervalRef.current) clearInterval(intervalRef.current)
     phaseRef.current = 'work'; sessionRef.current = 1
+    blockStartRef.current = null
     setRunning(false); setPhase('work'); setSession(1); setTimeLeft(workSecs); setDone(false)
   }
+
+  const sheet = (
+    <SessionNoteSheet
+      draft={draft}
+      tags={tags}
+      theme={t}
+      onSave={(note, tag) => commitDraft(note, tag)}
+      onSkip={() => commitDraft('', '')}
+    />
+  )
 
   const min = String(Math.floor(timeLeft / 60)).padStart(2, '0')
   const sec = String(timeLeft % 60).padStart(2, '0')
   const minutesLeft = Math.ceil(timeLeft / 60)
 
-  const phaseLabel = isWork ? `focus · ${session} of ${totalSessions}` : 'rest · breathe'
+  const phaseLabel = isWork
+    ? isBlock ? `time block · ${workMinutes} min` : `focus · ${session} of ${totalSessions}`
+    : 'rest · breathe'
 
   // ── CLOCK ───────────────────────────────────────────────────────────────
   // Dial keeps the digits inside its ring; Halo lets them run as big as the
@@ -193,6 +302,7 @@ export default function PomodoroTimer() {
           style={{ color: t.ghost }}>
           tap anywhere to exit
         </span>
+        {sheet}
       </div>
     )
   }
@@ -204,7 +314,9 @@ export default function PomodoroTimer() {
         style={{ background: t.bg, color: t.digits }}>
         <div className="text-6xl">🌟</div>
         <h2 className="text-3xl font-bold" style={{ color: t.accent }}>All done!</h2>
-        <p style={{ color: t.label }}>{totalSessions} sessions complete</p>
+        <p style={{ color: t.label }}>
+          {totalSessions} {totalSessions === 1 ? 'session' : 'sessions'} complete
+        </p>
         {intention && (
           <p className="text-sm italic text-center max-w-xs" style={{ color: t.ghost }}>{intention}</p>
         )}
@@ -213,8 +325,11 @@ export default function PomodoroTimer() {
           style={{ borderColor: t.ctlBorder, background: t.ctlBg, color: t.ctlText }}>
           Go again
         </button>
-        <button onClick={() => navigate('/pomodoro')} className="text-sm mt-1"
-          style={{ color: t.label }}>← New session</button>
+        <button onClick={() => navigate('/pomodoro/journal')} className="text-sm mt-1"
+          style={{ color: t.label }}>📓 View journal</button>
+        <button onClick={() => navigate('/pomodoro')} className="text-sm"
+          style={{ color: t.ghost }}>← New session</button>
+        {sheet}
       </div>
     )
   }
@@ -273,7 +388,7 @@ export default function PomodoroTimer() {
             </p>
           )}
         </div>
-        {dots}
+        {!isBlock && dots}
       </div>
 
       {/* Center: clock */}
@@ -317,12 +432,14 @@ export default function PomodoroTimer() {
             className={iconBtn} style={{ color: t.icon, opacity: 0.2 }}>
             <ExpandIcon />
           </button>
-          <button onClick={reset} aria-label="Reset"
+          <button onClick={() => leave('reset')} aria-label="Reset"
             className={`${iconBtn} text-lg`} style={{ color: t.icon, opacity: 0.2 }}>↺</button>
-          <button onClick={() => navigate('/pomodoro')} aria-label="Exit"
+          <button onClick={() => leave('exit')} aria-label="Exit"
             className={`${iconBtn} text-lg`} style={{ color: t.icon, opacity: 0.2 }}>✕</button>
         </div>
       </div>
+
+      {sheet}
     </div>
   )
 }

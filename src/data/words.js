@@ -23,6 +23,7 @@ export const WORD_LISTS = {
       'stingray', 'carp', 'trout', 'hare', 'vole', 'shrew', 'lemur', 'mandrill',
       'baboon', 'gibbon', 'wombat', 'quokka', 'armadillo',
     ],
+
     Food: [
       'pizza', 'sushi', 'tacos', 'burger', 'pasta', 'risotto', 'paella', 'curry',
       'ramen', 'pho', 'dumplings', 'falafel', 'hummus', 'kebab', 'biryani',
@@ -45,6 +46,7 @@ export const WORD_LISTS = {
       'salami', 'bacon', 'mayo', 'ketchup', 'mustard', 'ranch', 'aioli', 'pita',
       'tostada', 'tamale', 'empanada', 'ceviche', 'horchata', 'lassi', 'mochi',
     ],
+
     Places: [
       'beach', 'mountain', 'forest', 'desert', 'jungle', 'cave', 'canyon',
       'waterfall', 'glacier', 'volcano', 'island', 'bay', 'harbor', 'lighthouse',
@@ -61,6 +63,7 @@ export const WORD_LISTS = {
       'laundromat', 'garage', 'warehouse', 'laboratory', 'studio', 'rooftop',
       'basement', 'dungeon', 'attic', 'alley', 'plaza', 'harbor', 'lighthouse',
     ],
+
     Sports: [
       'football', 'soccer', 'basketball', 'baseball', 'tennis', 'golf', 'swimming',
       'surfing', 'skiing', 'snowboarding', 'cycling', 'running', 'yoga', 'pilates',
@@ -77,6 +80,7 @@ export const WORD_LISTS = {
       'equestrian', 'biking', 'climbing', 'sprinting', 'hurdles', 'snowshoeing',
       'paddleboarding', 'trampolining', 'acrobatics', 'falconry',
     ],
+
     Nature: [
       'tornado', 'hurricane', 'tsunami', 'earthquake', 'avalanche', 'flood',
       'drought', 'wildfire', 'blizzard', 'lightning', 'rainbow', 'aurora',
@@ -93,6 +97,7 @@ export const WORD_LISTS = {
       'sage', 'mint', 'rosemary', 'wisteria', 'fog', 'frost', 'dew', 'sleet',
       'atoll', 'reef', 'dune', 'canyon', 'gully', 'estuary', 'glacier',
     ],
+
     Objects: [
       'television', 'refrigerator', 'microwave', 'oven', 'dishwasher', 'blender',
       'toaster', 'fan', 'lamp', 'curtain', 'mirror', 'clock', 'bookshelf',
@@ -109,6 +114,7 @@ export const WORD_LISTS = {
       'trophy', 'medal', 'crown', 'sword', 'helmet', 'easel', 'paintbrush',
       'lighter', 'scissors', 'calendar', 'globe', 'dartboard', 'yo-yo', 'puppet',
     ],
+
     Professions: [
       'doctor', 'surgeon', 'nurse', 'dentist', 'pharmacist', 'veterinarian',
       'paramedic', 'therapist', 'professor', 'teacher', 'librarian', 'lawyer',
@@ -128,6 +134,7 @@ export const WORD_LISTS = {
       'acrobat', 'zookeeper', 'locksmith', 'taxidermist', 'sommelier', 'conductor',
       'choreographer', 'curator', 'illustrator', 'archivist',
     ],
+
     Technology: [
       'smartphone', 'laptop', 'tablet', 'smartwatch', 'headphones', 'speaker',
       'camera', 'drone', 'robot', 'satellite', 'rocket', 'keyboard', 'mouse',
@@ -145,27 +152,28 @@ export const WORD_LISTS = {
   es: {
     Animales: [
       'león', 'tigre', 'elefante', 'jirafa', 'cebra', 'delfín', 'ballena',
-      'tiburón', 'pingüino', 'águila', 'halcón', 'búcho', 'zorro', 'lobo',
+      'tiburón', 'pingüino', 'águila', 'halcón', 'búho', 'zorro', 'lobo',
       'oso', 'ciervo', 'conejo', 'ardilla', 'hámster', 'loro', 'flamenco',
       'pavo', 'avestruz', 'cocodrilo', 'caimán', 'cobra', 'pitón', 'gecko',
       'rana', 'sapo', 'cangrejo', 'langosta', 'medusa', 'pulpo', 'atún',
       'salmón', 'puercoespín', 'erizo', 'murciélago', 'canguro', 'koala',
-      'ornitorrinco', 'chimpancé', 'gorila', 'orangútán', 'perezoso', 'jaguar',
+      'ornitorrinco', 'chimpancé', 'gorila', 'orangután', 'perezoso', 'jaguar',
       'guepardo', 'leopardo', 'lince', 'nutria', 'castor', 'mofeta', 'mapache',
       'hiena', 'facóquero', 'gacela', 'bisonte', 'alce', 'camello', 'llama',
       'alpaca', 'burro', 'cabra', 'oveja', 'caballo', 'gallina', 'pato',
-      'cisne', 'paloma', 'colibrí', 'tucán', 'guacamayo', 'pelícano', 'cigüena',
+      'cisne', 'paloma', 'colibrí', 'tucán', 'guacamayo', 'pelícano', 'cigüeña',
       'garza', 'buitre', 'cuervo', 'gorrión', 'mariposa', 'polilla', 'abeja',
       'avispa', 'hormiga', 'saltamontes', 'libélula', 'luciérnaga', 'mariquita',
-      'escorpión', 'tarañtula', 'camaleón', 'iguana', 'salamandra', 'almeja',
+      'escorpión', 'tarántula', 'camaleón', 'iguana', 'salamandra', 'almeja',
       'ostra', 'mejillón', 'panda', 'ocelote', 'puma', 'coyote', 'chacal',
       'dingo', 'suricata', 'mangosta', 'comadreja', 'hurón', 'tejón', 'foca',
-      'morsa', 'narval', 'beluga', 'orca', 'manatí', 'hipópotamo', 'rinoceronte',
+      'morsa', 'narval', 'beluga', 'orca', 'manatí', 'hipopótamo', 'rinoceronte',
       'tapir', 'capibara', 'chinchilla', 'topo', 'oruga', 'cucaracha', 'ciempiés',
       'lombriz', 'caracol', 'calamar', 'piraña', 'barracuda', 'cachalote',
       'pastinaca', 'carpa', 'trucha', 'liebre', 'lemur', 'mandril', 'babuino',
       'gibón', 'wombat', 'armadillo', 'glotón', 'wolverina',
     ],
+
     Comida: [
       'pizza', 'sushi', 'tacos', 'hamburguesa', 'pasta', 'risotto', 'paella',
       'curry', 'ramen', 'dumplings', 'falafel', 'hummus', 'kebab', 'biryani',
@@ -188,6 +196,7 @@ export const WORD_LISTS = {
       'chorizo', 'pepperoni', 'tocino', 'mayonesa', 'catsup', 'mostaza',
       'tostada', 'tamale', 'empanada', 'ceviche', 'horchata', 'mochi',
     ],
+
     Lugares: [
       'playa', 'montaña', 'bosque', 'desierto', 'selva', 'cueva', 'cañón',
       'cascada', 'glaciar', 'volcán', 'isla', 'bahía', 'puerto', 'faro',
@@ -204,6 +213,7 @@ export const WORD_LISTS = {
       'bodega', 'peluquería', 'anfiteatro', 'laboratorio', 'estudio', 'azotea',
       'sótano', 'callejón', 'garaje', 'bodega', 'laundry', 'consultorio',
     ],
+
     Deportes: [
       'fútbol', 'baloncesto', 'béisbol', 'tenis', 'golf', 'natación', 'surf',
       'esquí', 'snowboard', 'ciclismo', 'atletismo', 'yoga', 'pilates', 'boxeo',
@@ -219,6 +229,7 @@ export const WORD_LISTS = {
       'parkour', 'polo', 'lacrosse', 'curling', 'equitación', 'ciclismo',
       'escalada', 'acrobacia', 'cetrería', 'trampolín', 'paddleboarding',
     ],
+
     Naturaleza: [
       'tornado', 'huracán', 'tsunami', 'terremoto', 'avalancha', 'inundación',
       'sequía', 'ventisca', 'relámpago', 'arcoíris', 'aurora', 'eclipse',
@@ -234,6 +245,7 @@ export const WORD_LISTS = {
       'menta', 'romero', 'tomillo', 'albahaca', 'glicinia', 'niebla', 'helada',
       'rocío', 'aguanieve', 'atolón', 'arrecife', 'duna', 'estuario',
     ],
+
     Objetos: [
       'televisión', 'refrigerador', 'microondas', 'horno', 'lavavajillas',
       'licuadora', 'tostadora', 'ventilador', 'lámpara', 'cortina', 'espejo',
@@ -251,6 +263,7 @@ export const WORD_LISTS = {
       'corona', 'espada', 'casco', 'caballete', 'pincel', 'encendedor',
       'calendario', 'globo terráqueo', 'marioneta', 'yoyo',
     ],
+
     Profesiones: [
       'médico', 'cirujano', 'enfermera', 'dentista', 'farmacéutico', 'veterinario',
       'paramédico', 'terapeuta', 'profesor', 'maestro', 'bibliotecario', 'abogado',
@@ -270,6 +283,7 @@ export const WORD_LISTS = {
       'mago', 'acróbata', 'cerrajero', 'cuidador', 'sommelier', 'director',
       'coreógrafo', 'curador', 'ilustrador',
     ],
+
     Tecnología: [
       'smartphone', 'laptop', 'tableta', 'smartwatch', 'audífonos', 'bocina',
       'cámara', 'dron', 'robot', 'satélite', 'cohete', 'teclado', 'ratón',
