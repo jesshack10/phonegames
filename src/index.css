@@ -15,3 +15,13 @@ body {
   from { transform: translateY(100%); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
+
+/* A finished period flashes the accent colour — catchable out of the corner
+   of your eye when the chime is missed or the phone is on silent. */
+@keyframes periodFlash {
+  0%   { opacity: 0; }
+  12%  { opacity: 0.5; }
+  30%  { opacity: 0.12; }
+  50%  { opacity: 0.42; }
+  100% { opacity: 0; }
+}
