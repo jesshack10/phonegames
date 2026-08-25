@@ -31,8 +31,11 @@ function write(key, value) {
 /**
  * An entry:
  * { id, startedAt, endedAt, plannedMinutes, actualMinutes,
- *   mode: 'pomodoro' | 'block', intention, note, tag, completed }
- * Timestamps are epoch ms. Breaks are never recorded.
+ *   mode: 'pomodoro' | 'block', intention, note, tag, details, next,
+ *   completed, manual }
+ * Timestamps are epoch ms. Breaks are never recorded. `details` is the long
+ * note, `next` what you said you'd do afterwards, `manual` marks a block typed
+ * in after the fact rather than timed.
  */
 export function list() {
   return read(ENTRIES_KEY, []).sort((a, b) => b.startedAt - a.startedAt)
@@ -113,4 +116,68 @@ export function formatDuration(minutes) {
   const h = Math.floor(m / 60)
   const rest = m % 60
   return rest ? `${h}h ${rest}m` : `${h}h`
+}
+
+// --- reading the journal back -------------------------------------------
+
+/** The most recent entry, for "same as last block". */
+export function lastEntry() {
+  const all = list()
+  return all.length ? all[0] : null
+}
+
+/** Minutes per tag over the given entries, largest first. Untagged is kept. */
+export function totalsByTag(entries) {
+  const byTag = new Map()
+  for (const e of entries) {
+    const key = e.tag || ''
+    byTag.set(key, (byTag.get(key) || 0) + e.actualMinutes)
+  }
+  return [...byTag.entries()]
+    .map(([tag, minutes]) => ({ tag, minutes }))
+    .sort((a, b) => b.minutes - a.minutes)
+}
+
+/**
+ * Untracked stretches between consecutive blocks on one day. The day is only
+ * as honest as its holes, so anything past the threshold is worth showing.
+ */
+export function findGaps(dayEntries, minMinutes = 15) {
+  const sorted = [...dayEntries].sort((a, b) => a.startedAt - b.startedAt)
+  const gaps = []
+  for (let i = 1; i < sorted.length; i++) {
+    const from = sorted[i - 1].endedAt
+    const to = sorted[i].startedAt
+    const minutes = Math.round((to - from) / 60000)
+    if (minutes >= minMinutes) gaps.push({ from, to, minutes, afterId: sorted[i - 1].id })
+  }
+  return gaps
+}
+
+/** Free-text search across everything the entry carries. */
+export function matchesQuery(entry, query) {
+  const q = query.trim().toLowerCase()
+  if (!q) return true
+  return [entry.note, entry.details, entry.tag, entry.intention, entry.next]
+    .filter(Boolean)
+    .some(field => String(field).toLowerCase().includes(q))
+}
+
+export function startOfDay(ms) {
+  const d = new Date(ms)
+  d.setHours(0, 0, 0, 0)
+  return d.getTime()
+}
+
+/** Local "YYYY-MM-DDTHH:MM" for datetime-local inputs. */
+export function toLocalInput(ms) {
+  const d = new Date(ms)
+  const pad = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+export function fromLocalInput(value) {
+  const ms = new Date(value).getTime()
+  return Number.isNaN(ms) ? null : ms
 }

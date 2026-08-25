@@ -6,12 +6,17 @@ import HaloVisual from '../../components/pomodoro/HaloVisual'
 import DialVisual from '../../components/pomodoro/DialVisual'
 import { VISUALS, getTheme } from '../../components/pomodoro/visualTheme'
 import SessionNoteSheet from '../../components/pomodoro/SessionNoteSheet'
-import { add as addEntry, listTags, newId } from '../../utils/journalStore'
+import useChime, { readSoundOn, storeSoundOn } from '../../components/pomodoro/useChime'
+import { add as addEntry, listTags, newId, lastEntry } from '../../utils/journalStore'
 
 const STORE_KEY = 'pomodoro-visual'
 
 // Below this, an abandoned block isn't worth journalling.
 const MIN_RECORDED_SECONDS = 60
+
+// One chime is easy to miss, so it repeats while the prompt sits unanswered.
+const NUDGE_EVERY_MS = 20000
+const NUDGE_LIMIT = 3
 
 function readStoredVisual() {
   try {
@@ -39,6 +44,27 @@ function HaloIcon() {
       <path d="M12 3 H18 A3 3 0 0 1 21 6 V18 A3 3 0 0 1 18 21 H6 A3 3 0 0 1 3 18 V6 A3 3 0 0 1 6 3 Z"
         opacity="0.3" />
       <path d="M12 3 H18 A3 3 0 0 1 21 6 V15" />
+    </svg>
+  )
+}
+
+function SoundOnIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 5 6 9H3v6h3l5 4z" />
+      <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+      <path d="M18.5 5.5a9 9 0 0 1 0 13" opacity="0.5" />
+    </svg>
+  )
+}
+
+function SoundOffIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 5 6 9H3v6h3l5 4z" />
+      <path d="M16 9.5 21 14.5 M21 9.5 16 14.5" />
     </svg>
   )
 }
@@ -81,22 +107,32 @@ export default function PomodoroTimer() {
   const [visual,   setVisual]   = useState(initialVisual)
   const [draft,    setDraft]    = useState(null)
   const [blockNum, setBlockNum] = useState(1)
+  const [liveIntention, setLiveIntention] = useState(intention)
+  const [last,     setLast]     = useState(() => lastEntry())
+  const [soundOn,  setSoundOn]  = useState(readSoundOn)
+  const [flash,    setFlash]    = useState(false)
   const [tags]                  = useState(() => listTags())
 
   const intervalRef  = useRef(null)
   const phaseRef     = useRef('work')
   const sessionRef   = useRef(1)
   const deadlineRef  = useRef(0)
-  // Wall-clock start of the focus block under way, set the first time it runs;
-  // null while the block hasn't been started yet.
+  // Wall-clock start of the current unlogged segment, set the first time it
+  // runs; null before the block has been started. A block split mid-way holds
+  // several segments, each logged as its own entry.
   const blockStartRef   = useRef(null)
   // What to do once the note sheet is dismissed.
   const pendingActionRef = useRef(null)
+  // The tick closure is built when the timer starts, so it would otherwise
+  // keep whatever sound setting was in force back then — muting mid-block
+  // has to reach it through a ref.
+  const soundOnRef = useRef(soundOn)
 
   const isWork = phase === 'work'
   const totalTime = isWork ? workSecs : breakSecs
   const remaining = Math.max(0, Math.min(1, timeLeft / totalTime))
   const t = getTheme(visual, phase)
+  const { unlock, play } = useChime()
   useWakeLock(running)
   const [dialRef, dialBox] = useBoxSize()
   // The ring is inscribed in its box, so the smaller side sets the clock size.
@@ -158,6 +194,26 @@ export default function PomodoroTimer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running])
 
+  useEffect(() => { soundOnRef.current = soundOn }, [soundOn])
+
+  useEffect(() => {
+    if (!draft || !draft.completed || !soundOn) return
+    let count = 0
+    const id = setInterval(() => {
+      if (++count > NUDGE_LIMIT) { clearInterval(id); return }
+      play('end')
+    }, NUDGE_EVERY_MS)
+    return () => clearInterval(id)
+  }, [draft, soundOn, play])
+
+  // A finished period should be visible from another tab too.
+  useEffect(() => {
+    if (!draft) return
+    const previous = document.title
+    document.title = '⏰ Period finished — what were you doing?'
+    return () => { document.title = previous }
+  }, [draft])
+
   function buildDraft(completed) {
     const startedAt = blockStartRef.current ?? Date.now()
     // On a natural finish the block ended at its deadline, not whenever a
@@ -171,14 +227,22 @@ export default function PomodoroTimer() {
       plannedMinutes: workMinutes,
       actualMinutes: Math.max(1, Math.round((endedAt - startedAt) / 60000)),
       mode,
-      intention,
+      intention: liveIntention,
       completed,
     }
   }
 
+  /** Chime plus a flash of colour, so a finished period is hard to miss. */
+  function announce(pattern) {
+    if (soundOnRef.current) play(pattern)
+    setFlash(true)
+    setTimeout(() => setFlash(false), 1200)
+  }
+
   /** A focus block just ran out. Breaks are not journalled, so they pass through. */
   function handlePhaseEnd() {
-    if (phaseRef.current === 'break') { startNextPhase(); return }
+    if (phaseRef.current === 'break') { announce('resume'); startNextPhase(); return }
+    announce('end')
     const lastSession = sessionRef.current >= totalSessions
     pendingActionRef.current = isBlock ? 'continue' : lastSession ? 'done' : 'next'
     // The sheet needs the keyboard and the controls, so drop out of fullscreen.
@@ -187,15 +251,37 @@ export default function PomodoroTimer() {
     setDraft({ ...buildDraft(true), canContinue: isBlock })
   }
 
-  function commitDraft(note, tag, choice) {
+  function commitDraft({ note = '', tag = '', details = '', next = '', choice } = {}) {
+    const action = pendingActionRef.current
+    const keepGoing = action === 'midblock' && choice !== 'finish'
+
     if (draft) {
-      const { canContinue, ...entry } = draft
-      addEntry({ id: newId(), ...entry, note: note || '', tag: tag || '' })
+      const { canContinue, midBlock, ...entry } = draft
+      const saved = {
+        ...entry,
+        id: newId(),
+        note, tag, details, next,
+        // A piece of work you closed on purpose to switch tasks is finished,
+        // not abandoned — only actually walking away leaves the block short.
+        completed: keepGoing ? true : entry.completed,
+        segment: action === 'midblock',
+      }
+      addEntry(saved)
+      setLast(saved)
     }
     setDraft(null)
-    const action = pendingActionRef.current
     pendingActionRef.current = null
-    if (action === 'continue') {
+
+    // Whatever you said you'd do next becomes the intention going forward.
+    if (next) setLiveIntention(next)
+
+    if (action === 'midblock') {
+      if (choice === 'finish') { navigate('/pomodoro'); return }
+      // Same block, same countdown — just a fresh segment from now.
+      blockStartRef.current = Date.now()
+      setRunning(true)
+    }
+    else if (action === 'continue') {
       // Chaining is the point of time blocks: unless the user explicitly
       // finishes, the next block starts on its own.
       if (choice === 'finish') navigate('/pomodoro')
@@ -228,13 +314,22 @@ export default function PomodoroTimer() {
   function leave(action) {
     if (elapsedSeconds() >= MIN_RECORDED_SECONDS) {
       setRunning(false)
-      pendingActionRef.current = action
+      // Exiting offers to log this piece and carry on in the same block;
+      // resetting is a restart, so it just captures what was done.
+      pendingActionRef.current = action === 'exit' ? 'midblock' : action
       setFsMode(false)
-      setDraft(buildDraft(false))
+      setDraft({ ...buildDraft(false), midBlock: action === 'exit' })
       return
     }
     if (action === 'reset') reset()
     else navigate('/pomodoro')
+  }
+
+  /** Backing out of stepping out: nothing logged, the countdown resumes. */
+  function cancelDraft() {
+    setDraft(null)
+    pendingActionRef.current = null
+    setRunning(true)
   }
 
   function reset() {
@@ -250,8 +345,10 @@ export default function PomodoroTimer() {
       draft={draft}
       tags={tags}
       theme={t}
+      last={last}
       onSave={commitDraft}
-      onSkip={() => commitDraft('', '')}
+      onSkip={() => commitDraft({})}
+      onCancel={cancelDraft}
     />
   )
 
@@ -324,6 +421,12 @@ export default function PomodoroTimer() {
           style={{ color: t.ghost }}>
           tap anywhere to exit
         </span>
+        {flash && (
+          <div
+            className="fixed inset-0 z-[55] pointer-events-none animate-[periodFlash_1.2s_ease-out]"
+            style={{ background: t.accent }}
+          />
+        )}
         {sheet}
       </div>
     )
@@ -339,8 +442,8 @@ export default function PomodoroTimer() {
         <p style={{ color: t.label }}>
           {totalSessions} {totalSessions === 1 ? 'session' : 'sessions'} complete
         </p>
-        {intention && (
-          <p className="text-sm italic text-center max-w-xs" style={{ color: t.ghost }}>{intention}</p>
+        {liveIntention && (
+          <p className="text-sm italic text-center max-w-xs" style={{ color: t.ghost }}>{liveIntention}</p>
         )}
         <button onClick={reset}
           className="px-10 py-4 rounded-2xl border-2 font-bold text-xl active:scale-95 transition-transform mt-3"
@@ -402,7 +505,7 @@ export default function PomodoroTimer() {
       <div className="flex flex-col items-center gap-3 px-6 mt-2 landscape:mt-0 z-10">
         <div className="text-center pointer-events-none">
           <p className="text-sm tracking-[0.2em] uppercase font-light" style={{ color: t.ghost }}>
-            {intention}
+            {liveIntention}
           </p>
           {description && (
             <p className="text-xs mt-1 landscape:hidden" style={{ color: t.ghost }}>
@@ -424,7 +527,7 @@ export default function PomodoroTimer() {
       {/* Bottom: controls */}
       <div className="flex flex-col items-center gap-3 pb-2 z-10">
         <button
-          onClick={() => setRunning(r => !r)}
+          onClick={() => { unlock(); setRunning(r => !r) }}
           aria-label={running ? 'Pause' : 'Start'}
           className="w-[72px] h-[72px] rounded-full flex items-center justify-center text-2xl
             active:scale-90 transition-all border-2"
@@ -450,6 +553,15 @@ export default function PomodoroTimer() {
 
           <div className="w-px h-5 mx-1.5" style={{ background: t.ghost }} />
 
+          <button
+            onClick={() => { const next = !soundOn; setSoundOn(next); storeSoundOn(next); if (next) { unlock(); play('end') } }}
+            aria-label={soundOn ? 'Sound on' : 'Sound off'}
+            aria-pressed={soundOn}
+            className={iconBtn}
+            style={{ color: t.icon, opacity: soundOn ? 0.85 : 0.2 }}>
+            {soundOn ? <SoundOnIcon /> : <SoundOffIcon />}
+          </button>
+
           <button onClick={() => setFsMode(true)} aria-label="Fullscreen"
             className={iconBtn} style={{ color: t.icon, opacity: 0.2 }}>
             <ExpandIcon />
@@ -461,6 +573,12 @@ export default function PomodoroTimer() {
         </div>
       </div>
 
+      {flash && (
+        <div
+          className="fixed inset-0 z-[55] pointer-events-none animate-[periodFlash_1.2s_ease-out]"
+          style={{ background: t.accent }}
+        />
+      )}
       {sheet}
     </div>
   )
