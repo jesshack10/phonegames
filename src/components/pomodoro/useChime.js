@@ -91,6 +91,7 @@ export default function useChime() {
   const ctxRef = useRef(null)
   const scheduledRef = useRef([])
   const keepAliveRef = useRef(null)
+  const keepAliveWiredRef = useRef(false)
 
   const unlock = useCallback(() => {
     try {
@@ -153,8 +154,20 @@ export default function useChime() {
           el.setAttribute('playsinline', '')
           keepAliveRef.current = el
         }
+        // Route it through the AudioContext so the context's own liveness is
+        // tied to this playback — otherwise iOS can suspend the context while
+        // the element plays on, and the scheduled chime never fires.
+        const ctx = ctxRef.current
+        if (ctx && !keepAliveWiredRef.current) {
+          try {
+            ctx.createMediaElementSource(keepAliveRef.current).connect(ctx.destination)
+            keepAliveWiredRef.current = true
+          } catch { /* already wired, or not permitted; playback alone still helps */ }
+        }
         const playing = keepAliveRef.current.play()
-        if (playing?.catch) playing.catch(() => { /* blocked until a gesture */ })
+        // MUST be called from inside a user gesture on iOS: a rejection here
+        // means no media session, and no background audio.
+        if (playing?.catch) playing.catch(() => { /* no gesture; caller retries on the next tap */ })
       } else if (keepAliveRef.current) {
         keepAliveRef.current.pause()
       }
