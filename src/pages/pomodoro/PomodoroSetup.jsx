@@ -4,6 +4,8 @@ import { VISUALS } from '../../components/pomodoro/visualTheme'
 
 const STORE_KEY = 'pomodoro-visual'
 
+const BLOCK_PRESETS = [15, 25, 30, 45, 60]
+
 function readStoredVisual() {
   try {
     const saved = localStorage.getItem(STORE_KEY)
@@ -68,20 +70,25 @@ function Counter({ label, value, onDec, onInc, color, unit }) {
 
 export default function PomodoroSetup() {
   const navigate = useNavigate()
+  const [mode,         setMode]         = useState('pomodoro')
   const [intention,    setIntention]    = useState('')
   const [description,  setDescription]  = useState('')
   const [workMinutes,  setWorkMinutes]  = useState(25)
   const [breakMinutes, setBreakMinutes] = useState(5)
   const [sessions,     setSessions]     = useState(4)
+  const [blockMinutes, setBlockMinutes] = useState(30)
   const [visual,       setVisual]       = useState(readStoredVisual)
+
+  const isBlock = mode === 'block'
 
   function start() {
     const params = new URLSearchParams({
+      mode,
       intention:    intention.trim() || 'Focus',
       description,
-      workMinutes:  String(workMinutes),
+      workMinutes:  String(isBlock ? blockMinutes : workMinutes),
       breakMinutes: String(breakMinutes),
-      sessions:     String(sessions),
+      sessions:     String(isBlock ? 1 : sessions),
       visual,
     })
     try { localStorage.setItem(STORE_KEY, visual) } catch { /* nothing to do */ }
@@ -96,6 +103,29 @@ export default function PomodoroSetup() {
           className="text-gray-600 text-sm active:opacity-50 transition-opacity"
         >← back</button>
         <h1 className="text-2xl font-bold tracking-widest text-amber-400">POMODORO</h1>
+        <button
+          onClick={() => navigate('/pomodoro/journal')}
+          className="ml-auto text-gray-500 text-sm active:opacity-50 transition-opacity"
+        >📓 Journal</button>
+      </div>
+
+      {/* Mode switch */}
+      <div className="flex bg-[#10102a] border border-gray-800 rounded-xl p-1">
+        {[
+          { id: 'pomodoro', label: 'Pomodoro' },
+          { id: 'block',    label: 'Time block' },
+        ].map(m => (
+          <button
+            key={m.id}
+            onClick={() => setMode(m.id)}
+            aria-pressed={mode === m.id}
+            className={`flex-1 py-2.5 rounded-lg text-sm transition-all ${
+              mode === m.id
+                ? 'bg-amber-500/15 text-amber-300 border border-amber-500/40'
+                : 'text-gray-600 border border-transparent'
+            }`}
+          >{m.label}</button>
+        ))}
       </div>
 
       <section className="flex flex-col gap-2.5">
@@ -116,7 +146,40 @@ export default function PomodoroSetup() {
       </section>
 
       <section className="flex flex-col gap-2.5">
-        <label className="text-[10px] text-gray-500 uppercase tracking-[0.2em]">Configuration</label>
+        <label className="text-[10px] text-gray-500 uppercase tracking-[0.2em]">
+          {isBlock ? 'Block length' : 'Configuration'}
+        </label>
+
+        {isBlock ? (
+          <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-5 gap-2">
+              {BLOCK_PRESETS.map(m => (
+                <button
+                  key={m}
+                  onClick={() => setBlockMinutes(m)}
+                  aria-pressed={blockMinutes === m}
+                  className={`py-3 rounded-xl text-sm tabular-nums border transition-all active:scale-95 ${
+                    blockMinutes === m
+                      ? 'border-amber-500/50 bg-amber-500/10 text-amber-300'
+                      : 'border-gray-800 bg-[#10102a] text-gray-500'
+                  }`}
+                >{m}</button>
+              ))}
+            </div>
+            <div className="flex gap-3">
+              <Counter
+                label="Minutes" value={blockMinutes}
+                onDec={() => setBlockMinutes(m => Math.max(1, m - 5))}
+                onInc={() => setBlockMinutes(m => Math.min(180, m + 5))}
+                color="text-amber-400" unit="min"
+              />
+            </div>
+            <p className="text-[11px] text-gray-700 leading-relaxed">
+              One continuous block, no breaks. When it ends you'll be asked what you were doing,
+              then you're back here to start the next one.
+            </p>
+          </div>
+        ) : (
         <div className="flex gap-3">
           <Counter
             label="Work" value={workMinutes}
@@ -137,6 +200,7 @@ export default function PomodoroSetup() {
             color="text-violet-400" unit="×"
           />
         </div>
+        )}
       </section>
 
       <section className="flex flex-col gap-2.5">
@@ -169,7 +233,7 @@ export default function PomodoroSetup() {
         onClick={start}
         className="w-full py-5 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-700 border border-amber-400/40 text-white text-xl font-bold tracking-wide shadow-[0_0_24px_rgba(245,158,11,0.25)] active:scale-95 transition-all mt-auto"
       >
-        Start Focus
+        {isBlock ? `Start ${blockMinutes} min block` : 'Start Focus'}
       </button>
     </div>
   )
