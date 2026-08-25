@@ -11,8 +11,9 @@ import { add as addEntry, listTags, newId, lastEntry } from '../../utils/journal
 
 const STORE_KEY = 'pomodoro-visual'
 
-// Below this, an abandoned block isn't worth journalling.
-const MIN_RECORDED_SECONDS = 60
+// Restarting a barely-begun block shouldn't nag, so ↺ only asks past this.
+// Leaving with ✕ always asks: time already spent must never vanish silently.
+const MIN_RESET_PROMPT_SECONDS = 60
 
 // One chime is easy to miss, so it repeats while the prompt sits unanswered.
 const NUDGE_EVERY_MS = 20000
@@ -226,6 +227,7 @@ export default function PomodoroTimer() {
       endedAt,
       plannedMinutes: workMinutes,
       actualMinutes: Math.max(1, Math.round((endedAt - startedAt) / 60000)),
+      actualSeconds: Math.round((endedAt - startedAt) / 1000),
       mode,
       intention: liveIntention,
       completed,
@@ -256,7 +258,7 @@ export default function PomodoroTimer() {
     const keepGoing = action === 'midblock' && choice !== 'finish'
 
     if (draft) {
-      const { canContinue, midBlock, ...entry } = draft
+      const { canContinue, midBlock, actualSeconds, ...entry } = draft
       const saved = {
         ...entry,
         id: newId(),
@@ -312,7 +314,13 @@ export default function PomodoroTimer() {
    * letting it vanish from the journal.
    */
   function leave(action) {
-    if (elapsedSeconds() >= MIN_RECORDED_SECONDS) {
+    const started = phaseRef.current === 'work' && blockStartRef.current != null
+    // ✕ always asks once the block is under way, however little time has
+    // passed — you decide whether it was worth logging, not a threshold.
+    const shouldAsk = started &&
+      (action === 'exit' || elapsedSeconds() >= MIN_RESET_PROMPT_SECONDS)
+
+    if (shouldAsk) {
       setRunning(false)
       // Exiting offers to log this piece and carry on in the same block;
       // resetting is a restart, so it just captures what was done.
@@ -332,6 +340,15 @@ export default function PomodoroTimer() {
     setRunning(true)
   }
 
+  /** Leaving without logging — for the ✕ that was a misclick. */
+  function discardDraft() {
+    setDraft(null)
+    const action = pendingActionRef.current
+    pendingActionRef.current = null
+    if (action === 'reset') reset()
+    else navigate('/pomodoro')
+  }
+
   function reset() {
     if (intervalRef.current) clearInterval(intervalRef.current)
     phaseRef.current = 'work'; sessionRef.current = 1
@@ -349,6 +366,7 @@ export default function PomodoroTimer() {
       onSave={commitDraft}
       onSkip={() => commitDraft({})}
       onCancel={cancelDraft}
+      onDiscard={discardDraft}
     />
   )
 

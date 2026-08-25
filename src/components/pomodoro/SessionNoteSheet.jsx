@@ -14,7 +14,7 @@ import { formatClock } from '../../utils/journalStore'
  * Colours come from the active visual's theme, so the sheet belongs to
  * whichever instrument is on screen.
  */
-export default function SessionNoteSheet({ draft, tags, theme, last, onSave, onSkip, onCancel }) {
+export default function SessionNoteSheet({ draft, tags, theme, last, onSave, onSkip, onCancel, onDiscard }) {
   const [note, setNote] = useState('')
   const [tag, setTag] = useState('')
   const [details, setDetails] = useState('')
@@ -80,7 +80,10 @@ export default function SessionNoteSheet({ draft, tags, theme, last, onSave, onS
             {draft.canContinue && ' · next one starts after this'}
           </span>
           <span className="text-sm tabular-nums" style={{ color: theme.accent }}>
-            ◷ {draft.actualMinutes} min · {formatClock(draft.startedAt)} – {formatClock(draft.endedAt)}
+            ◷ {draft.actualSeconds != null && draft.actualSeconds < 60
+              ? `${draft.actualSeconds} sec`
+              : `${draft.actualMinutes} min`}
+            {' · '}{formatClock(draft.startedAt)} – {formatClock(draft.endedAt)}
           </span>
         </div>
 
@@ -193,13 +196,24 @@ export default function SessionNoteSheet({ draft, tags, theme, last, onSave, onS
           </button>
         )}
 
-        {/* Stepping out was a choice, so backing out of it must be one too. */}
-        {draft.midBlock && onCancel && (
-          <button
-            onClick={onCancel}
-            className="py-1 text-xs active:opacity-50 transition-opacity"
-            style={{ color: 'rgba(255,255,255,0.22)' }}
-          >never mind — back to the timer</button>
+        {/* Stepping out was a choice, so backing out of it must be one too —
+            and a mistaken ✕ still needs a way out that logs nothing. */}
+        {draft.midBlock && (onCancel || onDiscard) && (
+          <div className="flex items-center justify-center gap-4 text-xs">
+            {onCancel && (
+              <button onClick={onCancel} className="py-1 active:opacity-50 transition-opacity"
+                style={{ color: 'rgba(255,255,255,0.22)' }}
+              >back to the timer</button>
+            )}
+            {onCancel && onDiscard && (
+              <span style={{ color: 'rgba(255,255,255,0.12)' }}>·</span>
+            )}
+            {onDiscard && (
+              <button onClick={onDiscard} className="py-1 active:opacity-50 transition-opacity"
+                style={{ color: 'rgba(255,255,255,0.22)' }}
+              >close without saving</button>
+            )}
+          </div>
         )}
       </div>
     </div>
