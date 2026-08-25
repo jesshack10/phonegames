@@ -133,7 +133,7 @@ export default function PomodoroTimer() {
   const totalTime = isWork ? workSecs : breakSecs
   const remaining = Math.max(0, Math.min(1, timeLeft / totalTime))
   const t = getTheme(visual, phase)
-  const { unlock, play } = useChime()
+  const { unlock, play, schedule, cancelScheduled, hasScheduled, setKeepAlive } = useChime()
   useWakeLock(running)
   const [dialRef, dialBox] = useBoxSize()
   // The ring is inscribed in its box, so the smaller side sets the clock size.
@@ -171,6 +171,13 @@ export default function PomodoroTimer() {
       blockStartRef.current = Date.now()
     }
 
+    // A JS timer dies with the backgrounded page; a scheduled audio event and
+    // an open media session survive it.
+    if (soundOnRef.current) {
+      schedule(phaseRef.current === 'break' ? 'resume' : 'end', timeLeft)
+      setKeepAlive(true)
+    }
+
     function tick() {
       const left = Math.max(0, Math.round((deadlineRef.current - Date.now()) / 1000))
       setTimeLeft(left)
@@ -189,6 +196,9 @@ export default function PomodoroTimer() {
     return () => {
       if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
       document.removeEventListener('visibilitychange', tick)
+      // Pausing, splitting or leaving must never leave a chime queued.
+      cancelScheduled()
+      setKeepAlive(false)
     }
     // timeLeft is read once, when the timer starts — re-running every tick
     // would keep pushing the deadline out.
@@ -236,7 +246,9 @@ export default function PomodoroTimer() {
 
   /** Chime plus a flash of colour, so a finished period is hard to miss. */
   function announce(pattern) {
-    if (soundOnRef.current) play(pattern)
+    // If one was queued for this moment it is already sounding — the effect's
+    // cleanup will clear it as the timer stops.
+    if (soundOnRef.current && !hasScheduled()) play(pattern)
     setFlash(true)
     setTimeout(() => setFlash(false), 1200)
   }
@@ -572,7 +584,20 @@ export default function PomodoroTimer() {
           <div className="w-px h-5 mx-1.5" style={{ background: t.ghost }} />
 
           <button
-            onClick={() => { const next = !soundOn; setSoundOn(next); storeSoundOn(next); if (next) { unlock(); play('end') } }}
+            onClick={() => {
+              const next = !soundOn
+              setSoundOn(next)
+              soundOnRef.current = next
+              storeSoundOn(next)
+              if (next) {
+                unlock()
+                play('end')
+                if (running) { schedule(isWork ? 'end' : 'resume', timeLeft); setKeepAlive(true) }
+              } else {
+                cancelScheduled()
+                setKeepAlive(false)
+              }
+            }}
             aria-label={soundOn ? 'Sound on' : 'Sound off'}
             aria-pressed={soundOn}
             className={iconBtn}
