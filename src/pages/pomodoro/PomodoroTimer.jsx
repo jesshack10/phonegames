@@ -173,9 +173,13 @@ export default function PomodoroTimer() {
 
     // A JS timer dies with the backgrounded page; a scheduled audio event and
     // an open media session survive it.
+    // The keep-alive is *not* started here: iOS only allows audio to begin
+    // inside the gesture's own call stack, and this effect runs after the
+    // click has returned. It is started from each control that starts a
+    // period, and left playing across the note prompt so the next block does
+    // not need a fresh tap.
     if (soundOnRef.current) {
       schedule(phaseRef.current === 'break' ? 'resume' : 'end', timeLeft)
-      setKeepAlive(true)
     }
 
     function tick() {
@@ -198,7 +202,6 @@ export default function PomodoroTimer() {
       document.removeEventListener('visibilitychange', tick)
       // Pausing, splitting or leaving must never leave a chime queued.
       cancelScheduled()
-      setKeepAlive(false)
     }
     // timeLeft is read once, when the timer starts — re-running every tick
     // would keep pushing the deadline out.
@@ -206,6 +209,8 @@ export default function PomodoroTimer() {
   }, [running])
 
   useEffect(() => { soundOnRef.current = soundOn }, [soundOn])
+
+  useEffect(() => () => setKeepAlive(false), [setKeepAlive])
 
   useEffect(() => {
     if (!draft || !draft.completed || !soundOn) return
@@ -267,6 +272,10 @@ export default function PomodoroTimer() {
 
   function commitDraft({ note = '', tag = '', details = '', next = '', choice } = {}) {
     const action = pendingActionRef.current
+    // Still inside the tap that dismissed the prompt: if the timer is about to
+    // carry on, take the chance to hold the media session open.
+    const carriesOn = choice !== 'finish' && action !== 'exit' && action !== 'done'
+    setKeepAlive(carriesOn && soundOnRef.current)
     const keepGoing = action === 'midblock' && choice !== 'finish'
 
     if (draft) {
@@ -349,6 +358,7 @@ export default function PomodoroTimer() {
   function cancelDraft() {
     setDraft(null)
     pendingActionRef.current = null
+    if (soundOnRef.current) setKeepAlive(true)   // still inside the tap
     setRunning(true)
   }
 
@@ -557,7 +567,13 @@ export default function PomodoroTimer() {
       {/* Bottom: controls */}
       <div className="flex flex-col items-center gap-3 pb-2 z-10">
         <button
-          onClick={() => { unlock(); setRunning(r => !r) }}
+          onClick={() => {
+            unlock()
+            const next = !running
+            // Inside the gesture, where iOS requires it.
+            setKeepAlive(next && soundOnRef.current)
+            setRunning(next)
+          }}
           aria-label={running ? 'Pause' : 'Start'}
           className="w-[72px] h-[72px] rounded-full flex items-center justify-center text-2xl
             active:scale-90 transition-all border-2"
