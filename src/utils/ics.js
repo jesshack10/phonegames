@@ -49,8 +49,10 @@ export function buildIcs(entries, { now = Date.now() } = {}) {
     const end = Math.max(entry.endedAt, entry.startedAt + 60000)
     const summary = entry.note?.trim() || entry.intention?.trim() || 'Focus block'
     const details = [
+      entry.details ? entry.details : null,
       entry.intention ? `Intention: ${entry.intention}` : null,
       entry.tag ? `Tag: ${entry.tag}` : null,
+      entry.next ? `Next: ${entry.next}` : null,
       `Mode: ${entry.mode === 'block' ? 'Time block' : 'Pomodoro'}`,
       `Planned: ${entry.plannedMinutes} min`,
       entry.completed ? null : 'Ended early',
@@ -78,11 +80,11 @@ export function buildIcs(entries, { now = Date.now() } = {}) {
  * reliably into Calendar, while PWA downloads are hit-or-miss there.
  * Returns 'shared' | 'cancelled' | 'downloaded'.
  */
-export async function deliverIcs(filename, content) {
-  const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' })
+export async function deliverIcs(filename, content, mime = 'text/calendar') {
+  const blob = new Blob([content], { type: `${mime};charset=utf-8` })
 
   try {
-    const file = new File([blob], filename, { type: 'text/calendar' })
+    const file = new File([blob], filename, { type: mime })
     if (navigator.canShare?.({ files: [file] })) {
       await navigator.share({ files: [file], title: filename })
       return 'shared'

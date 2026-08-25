@@ -7,7 +7,7 @@ import DialVisual from '../../components/pomodoro/DialVisual'
 import { VISUALS, getTheme } from '../../components/pomodoro/visualTheme'
 import SessionNoteSheet from '../../components/pomodoro/SessionNoteSheet'
 import useChime, { readSoundOn, storeSoundOn } from '../../components/pomodoro/useChime'
-import { add as addEntry, listTags, newId } from '../../utils/journalStore'
+import { add as addEntry, listTags, newId, lastEntry } from '../../utils/journalStore'
 
 const STORE_KEY = 'pomodoro-visual'
 
@@ -107,6 +107,8 @@ export default function PomodoroTimer() {
   const [visual,   setVisual]   = useState(initialVisual)
   const [draft,    setDraft]    = useState(null)
   const [blockNum, setBlockNum] = useState(1)
+  const [liveIntention, setLiveIntention] = useState(intention)
+  const [last,     setLast]     = useState(() => lastEntry())
   const [soundOn,  setSoundOn]  = useState(readSoundOn)
   const [flash,    setFlash]    = useState(false)
   const [tags]                  = useState(() => listTags())
@@ -115,8 +117,9 @@ export default function PomodoroTimer() {
   const phaseRef     = useRef('work')
   const sessionRef   = useRef(1)
   const deadlineRef  = useRef(0)
-  // Wall-clock start of the focus block under way, set the first time it runs;
-  // null while the block hasn't been started yet.
+  // Wall-clock start of the current unlogged segment, set the first time it
+  // runs; null before the block has been started. A block split mid-way holds
+  // several segments, each logged as its own entry.
   const blockStartRef   = useRef(null)
   // What to do once the note sheet is dismissed.
   const pendingActionRef = useRef(null)
@@ -224,7 +227,7 @@ export default function PomodoroTimer() {
       plannedMinutes: workMinutes,
       actualMinutes: Math.max(1, Math.round((endedAt - startedAt) / 60000)),
       mode,
-      intention,
+      intention: liveIntention,
       completed,
     }
   }
@@ -248,15 +251,37 @@ export default function PomodoroTimer() {
     setDraft({ ...buildDraft(true), canContinue: isBlock })
   }
 
-  function commitDraft(note, tag, choice) {
+  function commitDraft({ note = '', tag = '', details = '', next = '', choice } = {}) {
+    const action = pendingActionRef.current
+    const keepGoing = action === 'midblock' && choice !== 'finish'
+
     if (draft) {
-      const { canContinue, ...entry } = draft
-      addEntry({ id: newId(), ...entry, note: note || '', tag: tag || '' })
+      const { canContinue, midBlock, ...entry } = draft
+      const saved = {
+        ...entry,
+        id: newId(),
+        note, tag, details, next,
+        // A piece of work you closed on purpose to switch tasks is finished,
+        // not abandoned — only actually walking away leaves the block short.
+        completed: keepGoing ? true : entry.completed,
+        segment: action === 'midblock',
+      }
+      addEntry(saved)
+      setLast(saved)
     }
     setDraft(null)
-    const action = pendingActionRef.current
     pendingActionRef.current = null
-    if (action === 'continue') {
+
+    // Whatever you said you'd do next becomes the intention going forward.
+    if (next) setLiveIntention(next)
+
+    if (action === 'midblock') {
+      if (choice === 'finish') { navigate('/pomodoro'); return }
+      // Same block, same countdown — just a fresh segment from now.
+      blockStartRef.current = Date.now()
+      setRunning(true)
+    }
+    else if (action === 'continue') {
       // Chaining is the point of time blocks: unless the user explicitly
       // finishes, the next block starts on its own.
       if (choice === 'finish') navigate('/pomodoro')
@@ -289,13 +314,22 @@ export default function PomodoroTimer() {
   function leave(action) {
     if (elapsedSeconds() >= MIN_RECORDED_SECONDS) {
       setRunning(false)
-      pendingActionRef.current = action
+      // Exiting offers to log this piece and carry on in the same block;
+      // resetting is a restart, so it just captures what was done.
+      pendingActionRef.current = action === 'exit' ? 'midblock' : action
       setFsMode(false)
-      setDraft(buildDraft(false))
+      setDraft({ ...buildDraft(false), midBlock: action === 'exit' })
       return
     }
     if (action === 'reset') reset()
     else navigate('/pomodoro')
+  }
+
+  /** Backing out of stepping out: nothing logged, the countdown resumes. */
+  function cancelDraft() {
+    setDraft(null)
+    pendingActionRef.current = null
+    setRunning(true)
   }
 
   function reset() {
@@ -311,8 +345,10 @@ export default function PomodoroTimer() {
       draft={draft}
       tags={tags}
       theme={t}
+      last={last}
       onSave={commitDraft}
-      onSkip={() => commitDraft('', '')}
+      onSkip={() => commitDraft({})}
+      onCancel={cancelDraft}
     />
   )
 
@@ -406,8 +442,8 @@ export default function PomodoroTimer() {
         <p style={{ color: t.label }}>
           {totalSessions} {totalSessions === 1 ? 'session' : 'sessions'} complete
         </p>
-        {intention && (
-          <p className="text-sm italic text-center max-w-xs" style={{ color: t.ghost }}>{intention}</p>
+        {liveIntention && (
+          <p className="text-sm italic text-center max-w-xs" style={{ color: t.ghost }}>{liveIntention}</p>
         )}
         <button onClick={reset}
           className="px-10 py-4 rounded-2xl border-2 font-bold text-xl active:scale-95 transition-transform mt-3"
@@ -469,7 +505,7 @@ export default function PomodoroTimer() {
       <div className="flex flex-col items-center gap-3 px-6 mt-2 landscape:mt-0 z-10">
         <div className="text-center pointer-events-none">
           <p className="text-sm tracking-[0.2em] uppercase font-light" style={{ color: t.ghost }}>
-            {intention}
+            {liveIntention}
           </p>
           {description && (
             <p className="text-xs mt-1 landscape:hidden" style={{ color: t.ghost }}>
