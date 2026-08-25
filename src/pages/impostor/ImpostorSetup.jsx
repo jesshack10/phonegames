@@ -25,7 +25,6 @@ const T = {
     creating: 'Creating…',
     errName: 'Enter your name',
     errFailed: 'Failed to create game. Try again.',
-    errNoFirebase: 'Firebase not configured — add secrets to GitHub Actions',
     orCreate: 'or create a new game',
     joinBtn: 'Join →',
     joining: 'Joining…',
@@ -51,7 +50,6 @@ const T = {
     creating: 'Creando…',
     errName: 'Escribe tu nombre',
     errFailed: 'Error al crear la partida. Intenta de nuevo.',
-    errNoFirebase: 'Firebase no configurado — agrega los secrets en GitHub Actions',
     orCreate: 'o crea una nueva partida',
     joinBtn: 'Unirme →',
     joining: 'Uniéndose…',
@@ -67,6 +65,7 @@ const T = {
   },
 }
 
+// ── Stepper ────────────────────────────────────────────────────────────────────
 function Stepper({ label, value, onChange, min, max }) {
   return (
     <div className="flex items-center justify-between bg-white/5 rounded-2xl px-5 py-4 border border-white/10">
@@ -88,6 +87,9 @@ function Stepper({ label, value, onChange, min, max }) {
   )
 }
 
+// ── OTP code input ─────────────────────────────────────────────────────────────
+// Uses a single hidden text input as the source of truth so there is no
+// multi-input focus juggling. The 6 visual boxes are purely display.
 function CodeInput({ value, onChange }) {
   const inputRef = useRef(null)
   const filled = value.length
@@ -103,6 +105,7 @@ function CodeInput({ value, onChange }) {
       className="relative flex gap-2 justify-center"
       onClick={() => inputRef.current?.focus()}
     >
+      {/* Visual character boxes */}
       {Array.from({ length: 6 }, (_, i) => (
         <div
           key={i}
@@ -119,6 +122,8 @@ function CodeInput({ value, onChange }) {
           {value[i] ?? ''}
         </div>
       ))}
+
+      {/* Hidden input — covers the whole row so any tap on it triggers the keyboard */}
       <input
         ref={inputRef}
         type="text"
@@ -136,6 +141,7 @@ function CodeInput({ value, onChange }) {
   )
 }
 
+// ── Main component ─────────────────────────────────────────────────────────────
 export default function ImpostorSetup() {
   const navigate = useNavigate()
   const { uid, ready } = useAuth()
@@ -144,15 +150,15 @@ export default function ImpostorSetup() {
   const [category, setCategory] = useState('Todas')
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
-  const [step, setStep] = useState(null)
+  const [step, setStep] = useState(null) // null | 'join' | 'create'
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   const t = T[lang]
   const categoryNames = getCategoryNames(lang)
   const codeReady = code.length === 6
-  const firebaseReady = ready && !!uid
 
+  // Load last-used settings from localStorage
   useEffect(() => {
     const saved = localStorage.getItem(SETTINGS_KEY)
     if (!saved) return
@@ -194,8 +200,7 @@ export default function ImpostorSetup() {
   async function handleCreate() {
     const trimmed = name.trim()
     if (!trimmed) return setError(t.errName)
-    if (!uid) return setError(t.errNoFirebase)
-    if (loading) return
+    if (!uid || loading) return
     setLoading(true)
     setError('')
     try {
@@ -214,8 +219,7 @@ export default function ImpostorSetup() {
   async function handleJoin() {
     const trimmed = name.trim()
     if (!trimmed) return setError(t.errName)
-    if (!uid) return setError(t.errNoFirebase)
-    if (loading) return
+    if (!uid || loading) return
     setLoading(true)
     setError('')
     try {
@@ -239,6 +243,7 @@ export default function ImpostorSetup() {
     }
   }
 
+  // ── Name step ──────────────────────────────────────────────────────────────
   if (step === 'join' || step === 'create') {
     const isJoin = step === 'join'
     return (
@@ -246,12 +251,14 @@ export default function ImpostorSetup() {
         <button onClick={handleBack} className="text-white/40 text-sm self-start">
           {t.back}
         </button>
+
         <div className="text-center mt-8">
           <div className="text-6xl mb-3">🕵️</div>
           <p className="text-white/40 text-sm tracking-widest uppercase font-mono">
             {isJoin ? t.joiningCode(code) : t.newGame}
           </p>
         </div>
+
         <div className="w-full max-w-sm flex flex-col gap-3 mt-4">
           <div className="bg-white/5 rounded-2xl px-5 py-4 border border-white/10">
             <label className="text-white font-semibold text-lg block mb-3">{t.yourName}</label>
@@ -266,33 +273,30 @@ export default function ImpostorSetup() {
               className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white text-lg placeholder-white/30 outline-none focus:border-indigo-500"
             />
           </div>
-          {ready && !uid && (
-            <p className="text-amber-400 text-sm text-center">⚠ {t.errNoFirebase}</p>
-          )}
+
           {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+
           <button
             onClick={isJoin ? handleJoin : handleCreate}
-            disabled={!name.trim() || loading || !ready || !uid}
+            disabled={!name.trim() || loading || !ready}
             className="mt-2 w-full bg-red-500 active:bg-red-600 text-white font-black text-xl py-5 rounded-2xl tracking-wide transition-colors shadow-lg shadow-red-500/30 disabled:opacity-40"
           >
-            {!ready
-              ? t.connecting
-              : !uid
-                ? t.errNoFirebase
-                : loading
-                  ? (isJoin ? t.joining : t.creating)
-                  : (isJoin ? t.joinBtn : t.createBtn)}
+            {loading
+              ? (isJoin ? t.joining : t.creating)
+              : (isJoin ? t.joinBtn : t.createBtn)}
           </button>
         </div>
       </div>
     )
   }
 
+  // ── Main screen ────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#0a0a18] flex flex-col items-center px-5 py-8 gap-5">
       <button onClick={() => navigate('/')} className="text-white/40 text-sm self-start">
         ← {lang === 'es' ? 'Atrás' : 'Back'}
       </button>
+
       <div className="text-center">
         <div className="text-6xl mb-3">🕵️</div>
         <h1 className="text-5xl font-black text-white tracking-tight">
@@ -300,6 +304,8 @@ export default function ImpostorSetup() {
         </h1>
         <p className="text-white/40 mt-2 text-sm tracking-widest uppercase">{t.tagline}</p>
       </div>
+
+      {/* Language toggle */}
       <div className="flex gap-2 bg-white/5 border border-white/10 rounded-2xl p-1.5">
         {['en', 'es'].map(l => (
           <button
@@ -314,9 +320,12 @@ export default function ImpostorSetup() {
           </button>
         ))}
       </div>
+
       <div className="w-full max-w-sm flex flex-col gap-3">
+        {/* Join section */}
         <div className="flex flex-col gap-2">
           <CodeInput value={code} onChange={v => { setCode(v); setError('') }} />
+
           <button
             onClick={handleInitiateJoin}
             disabled={!codeReady}
@@ -329,13 +338,18 @@ export default function ImpostorSetup() {
             {t.joinBtn}
           </button>
         </div>
+
         {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+
+        {/* Divider */}
         <div className="flex items-center gap-3 mt-2">
           <div className="flex-1 h-px bg-white/10" />
           <p className="text-white/30 text-xs uppercase tracking-widest">{t.orCreate}</p>
           <div className="flex-1 h-px bg-white/10" />
         </div>
+
         <Stepper label={t.impostors} value={numImpostors} onChange={setNumImpostors} min={1} max={5} />
+
         <div className="bg-white/5 rounded-2xl px-5 py-4 border border-white/10">
           <label className="text-white font-semibold text-lg block mb-3">{t.category}</label>
           <div className="flex flex-wrap gap-2">
@@ -352,12 +366,13 @@ export default function ImpostorSetup() {
             ))}
           </div>
         </div>
+
         <button
           onClick={handleInitiateCreate}
-          disabled={loading || !ready || !firebaseReady}
+          disabled={loading || !ready}
           className="mt-2 w-full bg-red-500 active:bg-red-600 text-white font-black text-xl py-5 rounded-2xl tracking-wide transition-colors shadow-lg shadow-red-500/30 disabled:opacity-40"
         >
-          {!ready ? t.connecting : !uid ? t.errNoFirebase : t.createBtn}
+          {!ready ? t.connecting : t.createBtn}
         </button>
       </div>
     </div>
