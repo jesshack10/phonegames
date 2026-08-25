@@ -53,6 +53,7 @@ export default function SessionNoteSheet({ draft, tags, theme, onSave, onSkip })
         <div className="flex flex-col gap-1">
           <span className="text-[10px] uppercase tracking-[0.2em]" style={{ color: theme.label }}>
             {draft.completed ? 'Block complete' : 'Ended early'}
+            {draft.canContinue && ' · next one starts after this'}
           </span>
           <span className="text-sm tabular-nums" style={{ color: theme.accent }}>
             ◷ {draft.actualMinutes} min · {formatClock(draft.startedAt)} – {formatClock(draft.endedAt)}
@@ -110,11 +111,21 @@ export default function SessionNoteSheet({ draft, tags, theme, onSave, onSkip })
             style={{ borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.4)' }}
           >Skip</button>
           <button
-            onClick={() => onSave(note.trim(), tag)}
+            onClick={() => onSave(note.trim(), tag, 'continue')}
             className="flex-1 py-4 rounded-2xl border-2 font-bold active:scale-95 transition-transform"
             style={{ borderColor: theme.ctlBorder, background: theme.ctlBg, color: theme.ctlText }}
-          >Save</button>
+          >{draft.canContinue ? 'Save & continue' : 'Save'}</button>
         </div>
+
+        {/* Stopping is deliberate, not the default: the chain keeps going
+            unless you say otherwise. */}
+        {draft.canContinue && (
+          <button
+            onClick={() => onSave(note.trim(), tag, 'finish')}
+            className="-mt-2 py-1 text-xs active:opacity-50 transition-opacity"
+            style={{ color: 'rgba(255,255,255,0.35)' }}
+          >save &amp; finish for now</button>
+        )}
       </div>
     </div>
   )

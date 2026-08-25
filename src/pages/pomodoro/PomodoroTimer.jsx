@@ -80,6 +80,7 @@ export default function PomodoroTimer() {
   const [fsMode,   setFsMode]   = useState(false)
   const [visual,   setVisual]   = useState(initialVisual)
   const [draft,    setDraft]    = useState(null)
+  const [blockNum, setBlockNum] = useState(1)
   const [tags]                  = useState(() => listTags())
 
   const intervalRef  = useRef(null)
@@ -179,21 +180,39 @@ export default function PomodoroTimer() {
   function handlePhaseEnd() {
     if (phaseRef.current === 'break') { startNextPhase(); return }
     const lastSession = sessionRef.current >= totalSessions
-    pendingActionRef.current = isBlock ? 'exit' : lastSession ? 'done' : 'next'
+    pendingActionRef.current = isBlock ? 'continue' : lastSession ? 'done' : 'next'
     // The sheet needs the keyboard and the controls, so drop out of fullscreen.
     setFsMode(false)
-    setDraft(buildDraft(true))
+    // canContinue drives the sheet's buttons; it never reaches the journal.
+    setDraft({ ...buildDraft(true), canContinue: isBlock })
   }
 
-  function commitDraft(note, tag) {
-    if (draft) addEntry({ id: newId(), ...draft, note: note || '', tag: tag || '' })
+  function commitDraft(note, tag, choice) {
+    if (draft) {
+      const { canContinue, ...entry } = draft
+      addEntry({ id: newId(), ...entry, note: note || '', tag: tag || '' })
+    }
     setDraft(null)
     const action = pendingActionRef.current
     pendingActionRef.current = null
-    if (action === 'next') startNextPhase()
+    if (action === 'continue') {
+      // Chaining is the point of time blocks: unless the user explicitly
+      // finishes, the next block starts on its own.
+      if (choice === 'finish') navigate('/pomodoro')
+      else startNextBlock()
+    }
+    else if (action === 'next') startNextPhase()
     else if (action === 'done') setDone(true)
     else if (action === 'reset') reset()
     else if (action === 'exit') navigate('/pomodoro')
+  }
+
+  /** Another block of the same length, straight after the one just logged. */
+  function startNextBlock() {
+    blockStartRef.current = null
+    setBlockNum(n => n + 1)
+    setTimeLeft(workSecs)
+    setTimeout(() => setRunning(true), 900)
   }
 
   /** Elapsed seconds in the focus block currently under way. */
@@ -222,6 +241,7 @@ export default function PomodoroTimer() {
     if (intervalRef.current) clearInterval(intervalRef.current)
     phaseRef.current = 'work'; sessionRef.current = 1
     blockStartRef.current = null
+    setBlockNum(1)
     setRunning(false); setPhase('work'); setSession(1); setTimeLeft(workSecs); setDone(false)
   }
 
@@ -230,7 +250,7 @@ export default function PomodoroTimer() {
       draft={draft}
       tags={tags}
       theme={t}
-      onSave={(note, tag) => commitDraft(note, tag)}
+      onSave={commitDraft}
       onSkip={() => commitDraft('', '')}
     />
   )
@@ -240,7 +260,9 @@ export default function PomodoroTimer() {
   const minutesLeft = Math.ceil(timeLeft / 60)
 
   const phaseLabel = isWork
-    ? isBlock ? `time block · ${workMinutes} min` : `focus · ${session} of ${totalSessions}`
+    ? isBlock
+      ? `time block · ${workMinutes} min${blockNum > 1 ? ` · #${blockNum}` : ''}`
+      : `focus · ${session} of ${totalSessions}`
     : 'rest · breathe'
 
   // ── CLOCK ───────────────────────────────────────────────────────────────

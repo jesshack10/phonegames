@@ -176,7 +176,8 @@ export default function PomodoroSetup() {
             </div>
             <p className="text-[11px] text-gray-700 leading-relaxed">
               One continuous block, no breaks. When it ends you'll be asked what you were doing,
-              then you're back here to start the next one.
+              then the next block of the same length starts on its own — the prompt has a
+              "finish for now" option whenever you want to stop.
             </p>
           </div>
         ) : (
