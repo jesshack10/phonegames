@@ -133,7 +133,7 @@ export default function PomodoroTimer() {
   const totalTime = isWork ? workSecs : breakSecs
   const remaining = Math.max(0, Math.min(1, timeLeft / totalTime))
   const t = getTheme(visual, phase)
-  const { unlock, play, schedule, cancelScheduled, hasScheduled, setKeepAlive } = useChime()
+  const { unlock, play } = useChime()
   useWakeLock(running)
   const [dialRef, dialBox] = useBoxSize()
   // The ring is inscribed in its box, so the smaller side sets the clock size.
@@ -171,17 +171,6 @@ export default function PomodoroTimer() {
       blockStartRef.current = Date.now()
     }
 
-    // A JS timer dies with the backgrounded page; a scheduled audio event and
-    // an open media session survive it.
-    // The keep-alive is *not* started here: iOS only allows audio to begin
-    // inside the gesture's own call stack, and this effect runs after the
-    // click has returned. It is started from each control that starts a
-    // period, and left playing across the note prompt so the next block does
-    // not need a fresh tap.
-    if (soundOnRef.current) {
-      schedule(phaseRef.current === 'break' ? 'resume' : 'end', timeLeft)
-    }
-
     function tick() {
       const left = Math.max(0, Math.round((deadlineRef.current - Date.now()) / 1000))
       setTimeLeft(left)
@@ -200,8 +189,6 @@ export default function PomodoroTimer() {
     return () => {
       if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
       document.removeEventListener('visibilitychange', tick)
-      // Pausing, splitting or leaving must never leave a chime queued.
-      cancelScheduled()
     }
     // timeLeft is read once, when the timer starts — re-running every tick
     // would keep pushing the deadline out.
@@ -209,8 +196,6 @@ export default function PomodoroTimer() {
   }, [running])
 
   useEffect(() => { soundOnRef.current = soundOn }, [soundOn])
-
-  useEffect(() => () => setKeepAlive(false), [setKeepAlive])
 
   useEffect(() => {
     if (!draft || !draft.completed || !soundOn) return
@@ -251,9 +236,7 @@ export default function PomodoroTimer() {
 
   /** Chime plus a flash of colour, so a finished period is hard to miss. */
   function announce(pattern) {
-    // If one was queued for this moment it is already sounding — the effect's
-    // cleanup will clear it as the timer stops.
-    if (soundOnRef.current && !hasScheduled()) play(pattern)
+    if (soundOnRef.current) play(pattern)
     setFlash(true)
     setTimeout(() => setFlash(false), 1200)
   }
@@ -272,10 +255,6 @@ export default function PomodoroTimer() {
 
   function commitDraft({ note = '', tag = '', details = '', next = '', choice } = {}) {
     const action = pendingActionRef.current
-    // Still inside the tap that dismissed the prompt: if the timer is about to
-    // carry on, take the chance to hold the media session open.
-    const carriesOn = choice !== 'finish' && action !== 'exit' && action !== 'done'
-    setKeepAlive(carriesOn && soundOnRef.current)
     const keepGoing = action === 'midblock' && choice !== 'finish'
 
     if (draft) {
@@ -358,7 +337,6 @@ export default function PomodoroTimer() {
   function cancelDraft() {
     setDraft(null)
     pendingActionRef.current = null
-    if (soundOnRef.current) setKeepAlive(true)   // still inside the tap
     setRunning(true)
   }
 
@@ -567,13 +545,7 @@ export default function PomodoroTimer() {
       {/* Bottom: controls */}
       <div className="flex flex-col items-center gap-3 pb-2 z-10">
         <button
-          onClick={() => {
-            unlock()
-            const next = !running
-            // Inside the gesture, where iOS requires it.
-            setKeepAlive(next && soundOnRef.current)
-            setRunning(next)
-          }}
+          onClick={() => { unlock(); setRunning(r => !r) }}
           aria-label={running ? 'Pause' : 'Start'}
           className="w-[72px] h-[72px] rounded-full flex items-center justify-center text-2xl
             active:scale-90 transition-all border-2"
@@ -600,20 +572,7 @@ export default function PomodoroTimer() {
           <div className="w-px h-5 mx-1.5" style={{ background: t.ghost }} />
 
           <button
-            onClick={() => {
-              const next = !soundOn
-              setSoundOn(next)
-              soundOnRef.current = next
-              storeSoundOn(next)
-              if (next) {
-                unlock()
-                play('end')
-                if (running) { schedule(isWork ? 'end' : 'resume', timeLeft); setKeepAlive(true) }
-              } else {
-                cancelScheduled()
-                setKeepAlive(false)
-              }
-            }}
+            onClick={() => { const next = !soundOn; setSoundOn(next); storeSoundOn(next); if (next) { unlock(); play('end') } }}
             aria-label={soundOn ? 'Sound on' : 'Sound off'}
             aria-pressed={soundOn}
             className={iconBtn}
