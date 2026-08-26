@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { VISUALS } from '../../components/pomodoro/visualTheme'
+import { pushSupported, isEnabled as pushEnabled, enable as enablePush, disable as disablePush, isIos, isStandalone } from '../../utils/push'
 
 const STORE_KEY = 'pomodoro-visual'
 
@@ -78,8 +79,29 @@ export default function PomodoroSetup() {
   const [sessions,     setSessions]     = useState(4)
   const [blockMinutes, setBlockMinutes] = useState(30)
   const [visual,       setVisual]       = useState(readStoredVisual)
+  const [alarmOn,      setAlarmOn]      = useState(() => pushSupported() && pushEnabled())
+  const [alarmNote,    setAlarmNote]    = useState('')
 
   const isBlock = mode === 'block'
+
+  // Permission must be asked for inside the tap itself — iOS ignores a
+  // request that isn't tied to a gesture.
+  async function toggleAlarm() {
+    if (alarmOn) {
+      await disablePush()
+      setAlarmOn(false)
+      setAlarmNote('')
+      return
+    }
+    const { ok, reason } = await enablePush()
+    setAlarmOn(ok)
+    setAlarmNote(ok ? '' : {
+      'needs-home-screen': 'Add this app to your Home Screen first — iOS only allows alarms from there, not from a Safari tab.',
+      denied: 'Notifications are blocked for this site. Turn them back on in Settings → Notifications.',
+      dismissed: 'No permission given, so no alarm.',
+      unsupported: 'This browser can\'t do background alarms.',
+    }[reason] || 'Could not set up the alarm. Try again.')
+  }
 
   function start() {
     const params = new URLSearchParams({
@@ -203,6 +225,37 @@ export default function PomodoroSetup() {
         </div>
         )}
       </section>
+
+      {pushSupported() && (
+        <section className="flex flex-col gap-2">
+          <button
+            onClick={toggleAlarm}
+            aria-pressed={alarmOn}
+            className={`flex items-center gap-3 py-3 px-4 rounded-xl border transition-all active:scale-95 ${
+              alarmOn
+                ? 'border-amber-500/50 bg-amber-500/10 text-amber-300'
+                : 'border-gray-800 bg-[#10102a] text-gray-500'
+            }`}
+          >
+            <span className="text-lg">{alarmOn ? '🔔' : '🔕'}</span>
+            <span className="flex flex-col items-start leading-tight text-left">
+              <span className="text-sm">Alarm when a period ends</span>
+              <span className="text-[10px] text-gray-600">
+                {alarmOn
+                  ? 'Rings even with the phone locked'
+                  : 'Sound only works while the app is open'}
+              </span>
+            </span>
+          </button>
+          {alarmNote && <p className="text-[11px] text-amber-400/70 leading-relaxed">{alarmNote}</p>}
+          {!alarmOn && isIos() && !isStandalone() && (
+            <p className="text-[11px] text-gray-700 leading-relaxed">
+              On iPhone this needs the app added to your Home Screen — Share → Add to Home Screen —
+              and opened from there.
+            </p>
+          )}
+        </section>
+      )}
 
       <section className="flex flex-col gap-2.5">
         <label className="text-[10px] text-gray-500 uppercase tracking-[0.2em]">View</label>
