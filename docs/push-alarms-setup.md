@@ -2,8 +2,22 @@
 
 The code is in place. These steps need your Firebase account and your
 credentials, so they are yours to run. Nothing here is reversible-by-accident:
-if you stop after step 1, the app keeps working exactly as it does today, with
-the alarm control simply refusing to turn on.
+if you stop partway, the app keeps working exactly as it does today, with the
+alarm control simply refusing to turn on.
+
+## The short version
+
+Upgrade the project to Blaze (step 1 below — it needs a card, so no script can
+do it), then run:
+
+```
+cd functions && ./setup.sh
+```
+
+That handles the keys, the secrets, the deploy and the GitHub build secret in
+one pass, and prints the one database rule you still have to paste in by hand.
+The rest of this page is what the script does, in case you would rather do it
+step by step or something goes wrong.
 
 ## 1. Upgrade the Firebase project to Blaze
 
