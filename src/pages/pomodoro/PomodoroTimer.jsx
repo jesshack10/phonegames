@@ -8,6 +8,7 @@ import { VISUALS, getTheme } from '../../components/pomodoro/visualTheme'
 import SessionNoteSheet from '../../components/pomodoro/SessionNoteSheet'
 import useChime, { readSoundOn, storeSoundOn } from '../../components/pomodoro/useChime'
 import { add as addEntry, listTags, newId, lastEntry } from '../../utils/journalStore'
+import { scheduleAlarm, cancelAlarm } from '../../utils/push'
 
 const STORE_KEY = 'pomodoro-visual'
 
@@ -171,6 +172,17 @@ export default function PomodoroTimer() {
       blockStartRef.current = Date.now()
     }
 
+    // Book the background alarm for the same instant. A locked phone cannot
+    // run our timer, so the notification has to come from outside it.
+    const onBreak = phaseRef.current === 'break'
+    scheduleAlarm({
+      endsAt: deadlineRef.current,
+      title: onBreak ? 'Break over' : 'Period finished',
+      body: onBreak
+        ? 'Back to it — tap to start the next block.'
+        : 'Tap to log what you were doing.',
+    })
+
     function tick() {
       const left = Math.max(0, Math.round((deadlineRef.current - Date.now()) / 1000))
       setTimeLeft(left)
@@ -189,6 +201,8 @@ export default function PomodoroTimer() {
     return () => {
       if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
       document.removeEventListener('visibilitychange', tick)
+      // Pausing, splitting or leaving must never leave an alarm booked.
+      cancelAlarm()
     }
     // timeLeft is read once, when the timer starts — re-running every tick
     // would keep pushing the deadline out.
@@ -196,6 +210,8 @@ export default function PomodoroTimer() {
   }, [running])
 
   useEffect(() => { soundOnRef.current = soundOn }, [soundOn])
+
+  useEffect(() => () => { cancelAlarm() }, [])
 
   useEffect(() => {
     if (!draft || !draft.completed || !soundOn) return
