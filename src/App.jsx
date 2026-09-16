@@ -12,6 +12,10 @@ import PeticionesSetup from './pages/peticiones/PeticionesSetup.jsx'
 import PeticionesHost from './pages/peticiones/PeticionesHost.jsx'
 import PeticionesLobby from './pages/peticiones/PeticionesLobby.jsx'
 import PeticionesPlayer from './pages/peticiones/PeticionesPlayer.jsx'
+import LoteriaSetup from './pages/loteria/LoteriaSetup.jsx'
+import LoteriaModerador from './pages/loteria/LoteriaModerador.jsx'
+import LoteriaSala from './pages/loteria/LoteriaSala.jsx'
+import LoteriaJugar from './pages/loteria/LoteriaJugar.jsx'
 import PomodoroSetup from './pages/pomodoro/PomodoroSetup.jsx'
 import PomodoroTimer from './pages/pomodoro/PomodoroTimer.jsx'
 import PomodoroJournal from './pages/pomodoro/PomodoroJournal.jsx'
@@ -33,6 +37,10 @@ export default function App() {
         <Route path="/peticiones/host/:sessionId" element={<PeticionesHost />} />
         <Route path="/peticiones/lobby/:sessionId" element={<PeticionesLobby />} />
         <Route path="/peticiones/play/:sessionId" element={<PeticionesPlayer />} />
+        <Route path="/loteria" element={<LoteriaSetup />} />
+        <Route path="/loteria/moderador/:sessionId" element={<LoteriaModerador />} />
+        <Route path="/loteria/sala/:sessionId" element={<LoteriaSala />} />
+        <Route path="/loteria/jugar/:sessionId" element={<LoteriaJugar />} />
         <Route path="/pomodoro" element={<PomodoroSetup />} />
         <Route path="/pomodoro/timer" element={<PomodoroTimer />} />
         <Route path="/pomodoro/journal" element={<PomodoroJournal />} />
