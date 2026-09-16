@@ -15,6 +15,7 @@ const T = {
     yourName: 'Your name',
     placeholder: 'Enter your name…',
     joinBtn: 'Join Game →',
+    connecting: 'Connecting…',
     waiting: 'Waiting for game to start…',
     inRoom: (n) => `${n} player${n !== 1 ? 's' : ''} in room`,
     errName: 'Enter your name',
@@ -27,6 +28,7 @@ const T = {
     yourName: 'Tu nombre',
     placeholder: 'Escribe tu nombre…',
     joinBtn: 'Unirme →',
+    connecting: 'Conectando…',
     waiting: 'Esperando que inicie el juego…',
     inRoom: (n) => `${n} jugador${n !== 1 ? 'es' : ''} en la sala`,
     errName: 'Escribe tu nombre',
@@ -40,7 +42,7 @@ const T = {
 export default function ImpostorLobby() {
   const { sessionId } = useParams()
   const navigate = useNavigate()
-  const { uid, ready } = useAuth()
+  const { uid } = useAuth()
   const [lang, setLang] = useState('es')
   const [name, setName] = useState('')
   const [joined, setJoined] = useState(false)
@@ -136,10 +138,10 @@ export default function ImpostorLobby() {
           {error && <p className="text-red-400 text-sm">{error}</p>}
           <button
             onClick={handleJoin}
-            disabled={!name.trim() || !ready}
+            disabled={!name.trim() || !uid}
             className="w-full py-4 rounded-2xl bg-red-500 text-white text-lg font-bold disabled:opacity-40 active:scale-95 transition-transform"
           >
-            {t.joinBtn}
+            {uid ? t.joinBtn : t.connecting}
           </button>
         </div>
       </div>
