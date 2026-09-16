@@ -1,7 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { signInAnonymously } from 'firebase/auth'
-import { auth } from './firebase/config.js'
+import { auth, configError } from './firebase/config.js'
 import { reportAuthError } from './firebase/authState.js'
 import './index.css'
 import App from './App.jsx'
@@ -11,7 +11,7 @@ import App from './App.jsx'
 // couple of times for a flaky network, then surface the reason.
 async function startSession() {
   if (!auth) {
-    reportAuthError({ code: 'firebase-sin-configurar' })
+    reportAuthError({ code: `firebase-sin-configurar · ${configError ?? 'motivo desconocido'}` })
     return
   }
   for (let attempt = 0; attempt < 3; attempt++) {
