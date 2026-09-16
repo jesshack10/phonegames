@@ -66,7 +66,7 @@ function CodeInput({ value, onChange }) {
 
 export default function LoteriaSetup() {
   const navigate = useNavigate()
-  const { uid, ready } = useAuth()
+  const { uid } = useAuth()
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
   const [patterns, setPatterns] = useState(['full'])
@@ -194,12 +194,14 @@ export default function LoteriaSetup() {
 
           <button
             onClick={isJoin ? handleJoin : handleCreate}
-            disabled={!name.trim() || loading || !ready}
+            disabled={!name.trim() || loading || !uid}
             className="mt-2 w-full bg-amber-500 active:bg-amber-600 text-white font-black text-xl py-5 rounded-2xl tracking-wide transition-colors shadow-lg shadow-amber-500/30 disabled:opacity-40"
           >
-            {loading
-              ? (isJoin ? 'Uniéndose…' : 'Creando…')
-              : (isJoin ? 'Unirme →' : 'Crear sala →')}
+            {!uid
+              ? 'Conectando…'
+              : loading
+                ? (isJoin ? 'Uniéndose…' : 'Creando…')
+                : (isJoin ? 'Unirme →' : 'Crear sala →')}
           </button>
         </div>
       </div>
@@ -266,10 +268,10 @@ export default function LoteriaSetup() {
 
         <button
           onClick={() => { setError(''); setStep('create') }}
-          disabled={loading || !ready}
+          disabled={loading || !uid}
           className="mt-2 w-full bg-amber-500 active:bg-amber-600 text-white font-black text-xl py-5 rounded-2xl tracking-wide transition-colors shadow-lg shadow-amber-500/30 disabled:opacity-40"
         >
-          {!ready ? 'Conectando…' : 'Crear sala'}
+          {!uid ? 'Conectando…' : 'Crear sala'}
         </button>
       </div>
     </div>

@@ -14,7 +14,7 @@ import { PATTERNS } from '../../utils/loteria.js'
 export default function LoteriaSala() {
   const { sessionId } = useParams()
   const navigate = useNavigate()
-  const { uid, ready } = useAuth()
+  const { uid } = useAuth()
   const [name, setName] = useState('')
   const [joined, setJoined] = useState(false)
   const [players, setPlayers] = useState([])
@@ -102,10 +102,10 @@ export default function LoteriaSala() {
           {error && <p className="text-red-400 text-sm">{error}</p>}
           <button
             onClick={handleJoin}
-            disabled={!name.trim() || !ready}
+            disabled={!name.trim() || !uid}
             className="w-full py-4 rounded-2xl bg-amber-500 text-white text-lg font-bold disabled:opacity-40 active:scale-95 transition-transform"
           >
-            Unirme →
+            {uid ? 'Unirme →' : 'Conectando…'}
           </button>
         </div>
       </div>
