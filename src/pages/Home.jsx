@@ -32,7 +32,7 @@ export default function Home() {
         onClick={() => navigate('/loteria')}
         className="w-full max-w-xs py-6 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-800 border border-amber-400 text-white text-2xl font-bold tracking-wide shadow-lg active:scale-95 transition-transform"
       >
-        🎴 Lotería
+        🃏 Lotería
       </button>
 
       <button

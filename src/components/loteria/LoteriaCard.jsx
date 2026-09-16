@@ -45,7 +45,7 @@ export function LoteriaCard({ id, size = 'md', marked = false, dimmed = false, o
 }
 
 /** Hueco vacío del mismo tamaño que una carta (mazo aún sin cantar). */
-export function LoteriaCardPlaceholder({ label = '🎴' }) {
+export function LoteriaCardPlaceholder({ label = '🃏' }) {
   return (
     <div className="w-full aspect-[3/4] rounded-3xl border-2 border-dashed border-white/15 flex items-center justify-center text-5xl opacity-40">
       {label}

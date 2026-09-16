@@ -131,7 +131,7 @@ export default function LoteriaJugar() {
   if (winner) {
     return (
       <div className="min-h-screen bg-[#0a0a18] flex flex-col items-center px-6 py-10 gap-5">
-        <div className="text-7xl mt-8">{iWon ? '🏆' : '🎴'}</div>
+        <div className="text-7xl mt-8">{iWon ? '🏆' : '🃏'}</div>
         <h1 className="text-white text-3xl font-black text-center">
           {iWon ? '¡GANASTE!' : `¡${winner.name} ganó!`}
         </h1>

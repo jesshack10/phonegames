@@ -82,7 +82,7 @@ export default function LoteriaSala() {
   if (!joined) {
     return (
       <div className="min-h-screen bg-[#0a0a18] flex flex-col items-center justify-center px-6 gap-6">
-        <div className="text-6xl">🎴</div>
+        <div className="text-6xl">🃏</div>
         <h1 className="text-white text-3xl font-black">
           LOTE<span className="text-amber-500">RÍA</span>
         </h1>
@@ -116,7 +116,7 @@ export default function LoteriaSala() {
 
   return (
     <div className="min-h-screen bg-[#0a0a18] flex flex-col items-center px-6 py-10 gap-5">
-      <div className="text-5xl mt-10">🎴</div>
+      <div className="text-5xl mt-10">🃏</div>
       <h2 className="text-white text-2xl font-bold text-center">Esperando que reparta el moderador…</h2>
 
       {patterns.length > 0 && (

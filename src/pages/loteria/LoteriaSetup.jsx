@@ -152,7 +152,7 @@ export default function LoteriaSetup() {
         <button onClick={handleBack} className="text-white/40 text-sm self-start">← Atrás</button>
 
         <div className="text-center mt-8">
-          <div className="text-6xl mb-3">🎴</div>
+          <div className="text-6xl mb-3">🃏</div>
           <p className="text-white/40 text-sm tracking-widest uppercase font-mono">
             {isJoin ? `Uniéndose · ${code}` : 'Nueva sala'}
           </p>
@@ -201,7 +201,7 @@ export default function LoteriaSetup() {
       <button onClick={() => navigate('/')} className="text-white/40 text-sm self-start">← Atrás</button>
 
       <div className="text-center">
-        <div className="text-6xl mb-3">🎴</div>
+        <div className="text-6xl mb-3">🃏</div>
         <h1 className="text-5xl font-black text-white tracking-tight">
           LOTE<span className="text-amber-500">RÍA</span>
         </h1>
