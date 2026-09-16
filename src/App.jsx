@@ -1,5 +1,6 @@
 import { HashRouter, Routes, Route } from 'react-router-dom'
 import Home from './pages/Home.jsx'
+import AuthErrorBanner from './components/AuthErrorBanner.jsx'
 import ImpostorSetup from './pages/impostor/ImpostorSetup.jsx'
 import ImpostorHost from './pages/impostor/ImpostorHost.jsx'
 import ImpostorLobby from './pages/impostor/ImpostorLobby.jsx'
@@ -23,6 +24,7 @@ import PomodoroJournal from './pages/pomodoro/PomodoroJournal.jsx'
 export default function App() {
   return (
     <HashRouter>
+      <AuthErrorBanner />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/impostor" element={<ImpostorSetup />} />
