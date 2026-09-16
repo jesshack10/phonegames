@@ -12,7 +12,7 @@ import { useAuth } from '../../hooks/useAuth.js'
 export default function PeticionesLobby() {
   const { sessionId } = useParams()
   const navigate = useNavigate()
-  const { uid, ready } = useAuth()
+  const { uid } = useAuth()
   const [name, setName] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -105,10 +105,10 @@ export default function PeticionesLobby() {
         {error && <p className="text-red-400 text-sm">{error}</p>}
         <button
           onClick={handleJoin}
-          disabled={!name.trim() || !ready || loading}
+          disabled={!name.trim() || !uid || loading}
           className="w-full py-4 rounded-2xl bg-blue-500 active:bg-blue-600 text-white text-lg font-bold disabled:opacity-40 transition-colors"
         >
-          {loading ? 'Uniendo…' : 'Unirme →'}
+          {!uid ? 'Conectando…' : loading ? 'Uniendo…' : 'Unirme →'}
         </button>
       </div>
     </div>

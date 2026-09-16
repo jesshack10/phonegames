@@ -55,7 +55,7 @@ function CodeInput({ value, onChange }) {
 
 export default function PeticionesSetup() {
   const navigate = useNavigate()
-  const { uid, ready } = useAuth()
+  const { uid } = useAuth()
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
   const [step, setStep] = useState(null) // null | 'join' | 'create'
@@ -159,12 +159,14 @@ export default function PeticionesSetup() {
 
           <button
             onClick={isJoin ? handleJoin : handleCreate}
-            disabled={!name.trim() || loading || !ready}
+            disabled={!name.trim() || loading || !uid}
             className="w-full py-5 rounded-2xl bg-blue-500 active:bg-blue-600 text-white font-black text-xl tracking-wide shadow-lg shadow-blue-500/20 disabled:opacity-40 transition-colors"
           >
-            {loading
-              ? (isJoin ? 'Uniéndose…' : 'Creando…')
-              : (isJoin ? 'Unirme →' : 'Crear sesión →')}
+            {!uid
+              ? 'Conectando…'
+              : loading
+                ? (isJoin ? 'Uniéndose…' : 'Creando…')
+                : (isJoin ? 'Unirme →' : 'Crear sesión →')}
           </button>
         </div>
       </div>
@@ -214,10 +216,10 @@ export default function PeticionesSetup() {
 
         <button
           onClick={handleInitiateCreate}
-          disabled={loading || !ready}
+          disabled={loading || !uid}
           className="w-full py-5 rounded-2xl bg-blue-500 active:bg-blue-600 text-white font-black text-xl tracking-wide shadow-lg shadow-blue-500/20 disabled:opacity-40 transition-colors"
         >
-          {!ready ? 'Conectando…' : 'Crear sesión →'}
+          {!uid ? 'Conectando…' : 'Crear sesión →'}
         </button>
       </div>
     </div>

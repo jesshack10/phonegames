@@ -144,7 +144,7 @@ function CodeInput({ value, onChange }) {
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function ImpostorSetup() {
   const navigate = useNavigate()
-  const { uid, ready } = useAuth()
+  const { uid } = useAuth()
   const [lang, setLang] = useState('es')
   const [numImpostors, setNumImpostors] = useState(1)
   const [category, setCategory] = useState('Todas')
@@ -278,12 +278,14 @@ export default function ImpostorSetup() {
 
           <button
             onClick={isJoin ? handleJoin : handleCreate}
-            disabled={!name.trim() || loading || !ready}
+            disabled={!name.trim() || loading || !uid}
             className="mt-2 w-full bg-red-500 active:bg-red-600 text-white font-black text-xl py-5 rounded-2xl tracking-wide transition-colors shadow-lg shadow-red-500/30 disabled:opacity-40"
           >
-            {loading
-              ? (isJoin ? t.joining : t.creating)
-              : (isJoin ? t.joinBtn : t.createBtn)}
+            {!uid
+              ? t.connecting
+              : loading
+                ? (isJoin ? t.joining : t.creating)
+                : (isJoin ? t.joinBtn : t.createBtn)}
           </button>
         </div>
       </div>
@@ -369,10 +371,10 @@ export default function ImpostorSetup() {
 
         <button
           onClick={handleInitiateCreate}
-          disabled={loading || !ready}
+          disabled={loading || !uid}
           className="mt-2 w-full bg-red-500 active:bg-red-600 text-white font-black text-xl py-5 rounded-2xl tracking-wide transition-colors shadow-lg shadow-red-500/30 disabled:opacity-40"
         >
-          {!ready ? t.connecting : t.createBtn}
+          {!uid ? t.connecting : t.createBtn}
         </button>
       </div>
     </div>
