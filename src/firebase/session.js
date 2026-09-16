@@ -192,16 +192,18 @@ export async function getSessionMeta(sessionId) {
   return snap.val()
 }
 
-// Looks up a session by its 6-char code and detects which game it belongs to
-// by sniffing meta-shape fields. Returns { meta, game } where game is one of
-// 'werewolf' | 'impostor' | 'peticiones', or both null if the session doesn't
-// exist.
+// Looks up a session by its 6-char code and detects which game it belongs to.
+// Newer games tag themselves with meta.game; the older ones are detected by
+// sniffing meta-shape fields. Returns { meta, game } where game is one of
+// 'werewolf' | 'impostor' | 'peticiones' | 'loteria', or both null if the
+// session doesn't exist.
 export async function lookupSessionGame(sessionId) {
   const snap = await get(ref(db, `sessions/${sessionId}/meta`))
   const meta = snap.val()
   if (!meta) return { meta: null, game: null }
   let game
-  if (meta.roleConfig) game = 'werewolf'
+  if (meta.game) game = meta.game
+  else if (meta.roleConfig) game = 'werewolf'
   else if (meta.numImpostors !== undefined) game = 'impostor'
   else game = 'peticiones'
   return { meta, game }
@@ -408,4 +410,139 @@ export function subscribePeticionAssignment(sessionId, uid, cb, onError) {
     err => { console.error('subscribePeticionAssignment error:', err); onError?.(err) }
   )
   return () => off(r)
+}
+
+// ─── LOTERÍA ──────────────────────────────────────────────────────────────────
+// Estructura en Firebase:
+//   meta    { game:'loteria', phase, patterns[], round, drawnCount, winner }
+//   deck    [54 ids barajados]  — sólo lo lee el moderador
+//   drawn   { 0: id, 1: id… }   — cartas ya cantadas, en orden
+//   players { uid: { name, isHost, board[16], marks{} } }
+
+export async function createLoteriaSession(hostId, config) {
+  let sessionId, attempts = 0
+  while (attempts < 10) {
+    sessionId = generateSessionId()
+    const metaRef = ref(db, `sessions/${sessionId}/meta`)
+    let taken = false
+    await runTransaction(metaRef, (existing) => {
+      if (existing !== null) { taken = true; return existing }
+      return {
+        createdAt: Date.now(),
+        hostId,
+        game: 'loteria',
+        phase: 'lobby',
+        patterns: config.patterns,
+        round: 1,
+        drawnCount: 0,
+        winner: null,
+      }
+    })
+    if (!taken) break
+    attempts++
+  }
+  return sessionId
+}
+
+export async function joinLoteriaPlayer(sessionId, uid, name, isHost = false) {
+  await set(ref(db, `sessions/${sessionId}/players/${uid}`), {
+    name,
+    joinedAt: Date.now(),
+    isHost,
+    board: null,
+    marks: null,
+  })
+}
+
+export function subscribeLoteriaSession(sessionId, cb) {
+  const r = ref(db, `sessions/${sessionId}/meta`)
+  onValue(r, snap => cb(snap.val()))
+  return () => off(r)
+}
+
+export function subscribeLoteriaPlayers(sessionId, cb) {
+  const r = ref(db, `sessions/${sessionId}/players`)
+  onValue(r, snap => {
+    const val = snap.val() || {}
+    cb(Object.entries(val).map(([id, data]) => ({ id, ...data })))
+  })
+  return () => off(r)
+}
+
+// Cartas ya cantadas, en orden de salida. Los jugadores la usan sólo para
+// validar su "¡Lotería!"; su pantalla nunca la muestra.
+export function subscribeLoteriaDrawn(sessionId, cb) {
+  const r = ref(db, `sessions/${sessionId}/drawn`)
+  onValue(r, snap => {
+    const val = snap.val()
+    cb(Array.isArray(val) ? val.filter(v => v != null) : Object.values(val || {}))
+  })
+  return () => off(r)
+}
+
+export async function getLoteriaMeta(sessionId) {
+  const snap = await get(ref(db, `sessions/${sessionId}/meta`))
+  return snap.val()
+}
+
+/** El mazo barajado de la ronda en curso (lo recupera el moderador al recargar). */
+export async function getLoteriaDeck(sessionId) {
+  const snap = await get(ref(db, `sessions/${sessionId}/deck`))
+  return snap.val() || []
+}
+
+/**
+ * Arranca una ronda: baraja el mazo, reparte una tabla distinta a cada jugador
+ * y limpia marcas, cantadas y ganador. Sirve tanto para la primera partida como
+ * para "Nueva ronda" — en ese caso se pasa el número de ronda siguiente.
+ */
+export async function startLoteriaRound(sessionId, deck, boards, round) {
+  const updates = {
+    [`sessions/${sessionId}/deck`]: deck,
+    [`sessions/${sessionId}/drawn`]: null,
+    [`sessions/${sessionId}/claims`]: null,
+    [`sessions/${sessionId}/meta/phase`]: 'active',
+    [`sessions/${sessionId}/meta/round`]: round,
+    [`sessions/${sessionId}/meta/drawnCount`]: 0,
+    [`sessions/${sessionId}/meta/winner`]: null,
+  }
+  for (const [playerId, board] of Object.entries(boards)) {
+    updates[`sessions/${sessionId}/players/${playerId}/board`] = board
+    updates[`sessions/${sessionId}/players/${playerId}/marks`] = null
+  }
+  await update(ref(db), updates)
+}
+
+/** Canta la siguiente carta del mazo. index es cuántas se habían cantado ya. */
+export async function drawLoteriaCard(sessionId, index, cardId) {
+  await update(ref(db), {
+    [`sessions/${sessionId}/drawn/${index}`]: cardId,
+    [`sessions/${sessionId}/meta/drawnCount`]: index + 1,
+  })
+}
+
+/** Marca o desmarca una casilla de la tabla del jugador. */
+export async function setLoteriaMark(sessionId, uid, index, marked) {
+  await set(ref(db, `sessions/${sessionId}/players/${uid}/marks/${index}`), marked ? true : null)
+}
+
+/**
+ * Declara ganador. Usa una transacción para que si dos jugadores cantan
+ * "¡Lotería!" casi al mismo tiempo, sólo el primero se quede con la victoria.
+ */
+export async function declareLoteriaWinner(sessionId, uid, name, pattern) {
+  const winnerRef = ref(db, `sessions/${sessionId}/meta/winner`)
+  const result = await runTransaction(winnerRef, (existing) => {
+    if (existing) return existing
+    return { uid, name, pattern, at: Date.now() }
+  })
+  const winner = result.snapshot.val()
+  if (winner?.uid === uid) {
+    await update(ref(db, `sessions/${sessionId}/meta`), { phase: 'won' })
+  }
+  return winner
+}
+
+export async function updateLoteriaMeta(sessionId, updates) {
+  await update(ref(db, `sessions/${sessionId}/meta`), updates)
 }

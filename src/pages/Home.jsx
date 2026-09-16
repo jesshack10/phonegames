@@ -29,6 +29,13 @@ export default function Home() {
       </button>
 
       <button
+        onClick={() => navigate('/loteria')}
+        className="w-full max-w-xs py-6 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-800 border border-amber-400 text-white text-2xl font-bold tracking-wide shadow-lg active:scale-95 transition-transform"
+      >
+        🎴 Lotería
+      </button>
+
+      <button
         onClick={() => navigate('/pomodoro')}
         className="w-full max-w-xs py-6 rounded-2xl bg-gradient-to-br from-amber-600 to-amber-900 border border-amber-500 text-white text-2xl font-bold tracking-wide shadow-lg active:scale-95 transition-transform"
       >
