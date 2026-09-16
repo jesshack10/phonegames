@@ -15,6 +15,11 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # The deploy job below runs in the github-pages environment. Declaring it
+    # here too means secrets scoped to that environment reach the build, which
+    # is the step that actually needs them — Vite bakes them into the bundle.
+    # Repository-level secrets keep working either way.
+    environment: github-pages
     steps:
       - uses: actions/checkout@v4
 
@@ -24,6 +29,42 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      # A build without these publishes a site where no game can open a room:
+      # Firebase never initialises, so nothing can authenticate or write. That
+      # failed silently once already — fail the deploy instead, and name what
+      # is missing.
+      - name: Verify Firebase secrets reached the build
+        env:
+          # Names only — every value in here is masked in the log. Printed when
+          # the check fails so it is obvious whether a secret is absent, named
+          # differently, or scoped somewhere this job cannot see.
+          ALL_SECRETS: ${{ toJSON(secrets) }}
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_DATABASE_URL: ${{ secrets.VITE_FIREBASE_DATABASE_URL }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+        run: |
+          missing=""
+          for name in VITE_FIREBASE_API_KEY VITE_FIREBASE_AUTH_DOMAIN \
+                      VITE_FIREBASE_DATABASE_URL VITE_FIREBASE_PROJECT_ID \
+                      VITE_FIREBASE_APP_ID; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::These secrets never reached the build:$missing"
+            echo ""
+            echo "Secret names this job can actually see:"
+            echo "$ALL_SECRETS" | jq -r 'keys[]' | sed 's/^/  - /'
+            echo ""
+            echo "Set them under Settings -> Secrets and variables -> Actions."
+            echo "Repository secrets work for every job. Secrets stored on an"
+            echo "environment only reach jobs that declare that environment."
+            echo "Organization secrets require the repo to be granted access."
+            exit 1
+          fi
+          echo "All five Firebase secrets reached the build."
 
       - run: npm run build
         env:
