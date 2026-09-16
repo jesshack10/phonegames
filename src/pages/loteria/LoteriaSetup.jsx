@@ -12,6 +12,14 @@ import { PATTERNS, PATTERN_KEYS } from '../../utils/loteria.js'
 
 const SETTINGS_KEY = 'loteria_settings'
 
+const AUTH_PENDING = 'Aún conectando con el servidor. Espera un momento y vuelve a intentar.'
+
+// Firebase errors carry the useful part in `code`; without it a failed write
+// shows up as a bare "no se pudo" and there is nothing left to diagnose with.
+function describe(e) {
+  return e?.code || e?.message || 'error desconocido'
+}
+
 // ── Entrada del código — input oculto + 6 casillas visuales ──────────────────
 function CodeInput({ value, onChange }) {
   const inputRef = useRef(null)
@@ -100,7 +108,8 @@ export default function LoteriaSetup() {
   async function handleCreate() {
     const trimmed = name.trim()
     if (!trimmed) return setError('Escribe tu nombre')
-    if (!uid || loading) return
+    if (loading) return
+    if (!uid) return setError(AUTH_PENDING)
     setLoading(true)
     setError('')
     try {
@@ -110,8 +119,9 @@ export default function LoteriaSetup() {
       await joinLoteriaPlayer(sessionId, uid, trimmed, true)
       localStorage.setItem(`lot_${sessionId}`, JSON.stringify({ uid, name: trimmed }))
       navigate(`/loteria/moderador/${sessionId}`)
-    } catch {
-      setError('No se pudo crear la sala')
+    } catch (e) {
+      console.error('crear sala falló:', e)
+      setError(`No se pudo crear la sala: ${describe(e)}`)
     } finally {
       setLoading(false)
     }
@@ -120,7 +130,8 @@ export default function LoteriaSetup() {
   async function handleJoin() {
     const trimmed = name.trim()
     if (!trimmed) return setError('Escribe tu nombre')
-    if (!uid || loading) return
+    if (loading) return
+    if (!uid) return setError(AUTH_PENDING)
     setLoading(true)
     setError('')
     try {
@@ -137,8 +148,8 @@ export default function LoteriaSetup() {
       localStorage.setItem(`lot_${code}`, JSON.stringify({ uid, name: trimmed }))
       navigate(`/loteria/sala/${code}`, { replace: true })
     } catch (e) {
-      console.error('join failed:', e)
-      setError(`Error al unirte: ${e?.code || e?.message || ''}`)
+      console.error('unirse falló:', e)
+      setError(`Error al unirte: ${describe(e)}`)
     } finally {
       setLoading(false)
     }

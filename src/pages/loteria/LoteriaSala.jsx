@@ -62,7 +62,7 @@ export default function LoteriaSala() {
     const trimmed = name.trim()
     if (!trimmed) return setError('Escribe tu nombre')
     if (trimmed.length > 16) return setError('Nombre muy largo (máx 16)')
-    if (!uid) return
+    if (!uid) return setError('Aún conectando con el servidor. Espera un momento y vuelve a intentar.')
     try {
       const m = await getLoteriaMeta(sessionId)
       if (!m) return setError('Sala no encontrada')
@@ -74,8 +74,9 @@ export default function LoteriaSala() {
       await joinLoteriaPlayer(sessionId, uid, trimmed, false)
       localStorage.setItem(storageKey, JSON.stringify({ uid, name: trimmed }))
       setJoined(true)
-    } catch {
-      setError('Error al unirte. Intenta de nuevo.')
+    } catch (e) {
+      console.error('unirse falló:', e)
+      setError(`Error al unirte: ${e?.code || e?.message || 'error desconocido'}`)
     }
   }
 
