@@ -36,6 +36,10 @@ jobs:
       # is missing.
       - name: Verify Firebase secrets reached the build
         env:
+          # Names only — every value in here is masked in the log. Printed when
+          # the check fails so it is obvious whether a secret is absent, named
+          # differently, or scoped somewhere this job cannot see.
+          ALL_SECRETS: ${{ toJSON(secrets) }}
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
           VITE_FIREBASE_DATABASE_URL: ${{ secrets.VITE_FIREBASE_DATABASE_URL }}
@@ -50,9 +54,14 @@ jobs:
           done
           if [ -n "$missing" ]; then
             echo "::error::These secrets never reached the build:$missing"
+            echo ""
+            echo "Secret names this job can actually see:"
+            echo "$ALL_SECRETS" | jq -r 'keys[]' | sed 's/^/  - /'
+            echo ""
             echo "Set them under Settings -> Secrets and variables -> Actions."
             echo "Repository secrets work for every job. Secrets stored on an"
             echo "environment only reach jobs that declare that environment."
+            echo "Organization secrets require the repo to be granted access."
             exit 1
           fi
           echo "All five Firebase secrets reached the build."
