@@ -14,7 +14,7 @@ import { PATTERNS } from '../../utils/loteria.js'
 export default function LoteriaSala() {
   const { sessionId } = useParams()
   const navigate = useNavigate()
-  const { uid, ready } = useAuth()
+  const { uid } = useAuth()
   const [name, setName] = useState('')
   const [joined, setJoined] = useState(false)
   const [players, setPlayers] = useState([])
@@ -62,7 +62,7 @@ export default function LoteriaSala() {
     const trimmed = name.trim()
     if (!trimmed) return setError('Escribe tu nombre')
     if (trimmed.length > 16) return setError('Nombre muy largo (máx 16)')
-    if (!uid) return
+    if (!uid) return setError('Aún conectando con el servidor. Espera un momento y vuelve a intentar.')
     try {
       const m = await getLoteriaMeta(sessionId)
       if (!m) return setError('Sala no encontrada')
@@ -74,8 +74,9 @@ export default function LoteriaSala() {
       await joinLoteriaPlayer(sessionId, uid, trimmed, false)
       localStorage.setItem(storageKey, JSON.stringify({ uid, name: trimmed }))
       setJoined(true)
-    } catch {
-      setError('Error al unirte. Intenta de nuevo.')
+    } catch (e) {
+      console.error('unirse falló:', e)
+      setError(`Error al unirte: ${e?.code || e?.message || 'error desconocido'}`)
     }
   }
 
@@ -101,10 +102,10 @@ export default function LoteriaSala() {
           {error && <p className="text-red-400 text-sm">{error}</p>}
           <button
             onClick={handleJoin}
-            disabled={!name.trim() || !ready}
+            disabled={!name.trim() || !uid}
             className="w-full py-4 rounded-2xl bg-amber-500 text-white text-lg font-bold disabled:opacity-40 active:scale-95 transition-transform"
           >
-            Unirme →
+            {uid ? 'Unirme →' : 'Conectando…'}
           </button>
         </div>
       </div>
