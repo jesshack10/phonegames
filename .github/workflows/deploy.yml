@@ -15,11 +15,6 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # The deploy job below runs in the github-pages environment. Declaring it
-    # here too means secrets scoped to that environment reach the build, which
-    # is the step that actually needs them — Vite bakes them into the bundle.
-    # Repository-level secrets keep working either way.
-    environment: github-pages
     steps:
       - uses: actions/checkout@v4
 
