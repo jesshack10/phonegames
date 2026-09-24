@@ -1,5 +1,5 @@
 import { cardGradient } from '../../data/loteria.js'
-import { getDeckCard } from '../../data/decks/index.js'
+import { findCard } from '../../utils/loteria.js'
 
 /**
  * Una carta de la baraja. size:
@@ -7,8 +7,8 @@ import { getDeckCard } from '../../data/decks/index.js'
  *   'md' — casilla de la tabla del jugador
  *   'sm' — miniatura del historial de cantadas
  */
-export function LoteriaCard({ id, deckId, size = 'md', marked = false, dimmed = false, onClick }) {
-  const card = getDeckCard(deckId, id)
+export function LoteriaCard({ id, deck, size = 'md', marked = false, dimmed = false, onClick }) {
+  const card = findCard(deck, id)
   if (!card) return null
 
   // Las barajas temáticas traen nombres mucho más largos que la tradicional

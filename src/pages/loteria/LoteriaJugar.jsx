@@ -10,6 +10,7 @@ import {
 import { useAuth } from '../../hooks/useAuth.js'
 import { LoteriaBoard } from '../../components/loteria/LoteriaBoard.jsx'
 import { checkWin, normalizeDrawn, PATTERNS } from '../../utils/loteria.js'
+import { resolveDeck } from '../../data/decks/index.js'
 
 function buzz(ms) {
   try { navigator.vibrate?.(ms) } catch {}
@@ -40,7 +41,7 @@ export default function LoteriaJugar() {
 
   // Llega dentro de meta; la pantalla nunca la muestra, sólo valida con ella.
   const drawn = normalizeDrawn(meta?.drawn)
-  const deckId = meta?.deck
+  const deck = resolveDeck(meta)
   const me = players.find(p => p.id === uid)
   const board = me?.board
   const round = meta?.round ?? 1
@@ -143,7 +144,7 @@ export default function LoteriaJugar() {
         </p>
 
         <div className="w-full max-w-sm mt-2 opacity-60 pointer-events-none">
-          <LoteriaBoard board={board} deckId={deckId} marks={marks} disabled />
+          <LoteriaBoard board={board} deck={deck} marks={marks} disabled />
         </div>
 
         <div className="flex gap-1 mt-2">
@@ -176,7 +177,7 @@ export default function LoteriaJugar() {
       </div>
 
       <div className="w-full max-w-sm">
-        <LoteriaBoard board={board} deckId={deckId} marks={marks} onToggle={handleToggle} />
+        <LoteriaBoard board={board} deck={deck} marks={marks} onToggle={handleToggle} />
       </div>
 
       {falseAlarm && (

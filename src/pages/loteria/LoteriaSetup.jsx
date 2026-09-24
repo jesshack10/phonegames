@@ -10,6 +10,7 @@ import {
 import { useAuth } from '../../hooks/useAuth.js'
 import { PATTERNS, PATTERN_KEYS } from '../../utils/loteria.js'
 import { DECKS, DECK_IDS, DEFAULT_DECK } from '../../data/decks/index.js'
+import { parseCustomDeck, CUSTOM_DECK_ID, MIN_CUSTOM_CARDS } from '../../data/decks/custom.js'
 
 const SETTINGS_KEY = 'loteria_settings'
 
@@ -72,11 +73,16 @@ export default function LoteriaSetup() {
   const [code, setCode] = useState('')
   const [patterns, setPatterns] = useState(['full'])
   const [deck, setDeck] = useState(DEFAULT_DECK)
+  const [customText, setCustomText] = useState('')
   const [step, setStep] = useState(null) // null | 'join' | 'create'
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   const codeReady = code.length === 6
+  // Se recalcula mientras escribe para mostrar cuántas cartas lleva.
+  const customCards = deck === CUSTOM_DECK_ID ? parseCustomDeck(customText).cards : []
+  const customCount = customCards.length
+  const customPreview = customCards.slice(0, 3)
 
   useEffect(() => {
     const saved = localStorage.getItem(SETTINGS_KEY)
@@ -84,7 +90,7 @@ export default function LoteriaSetup() {
     try {
       const { patterns: p, deck: d } = JSON.parse(saved)
       if (Array.isArray(p) && p.length) setPatterns(p)
-      if (d && DECKS[d]) setDeck(d)
+      if (d && (DECKS[d] || d === CUSTOM_DECK_ID)) setDeck(d)
     } catch {}
   }, [])
 
@@ -118,7 +124,13 @@ export default function LoteriaSetup() {
     try {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify({ patterns, deck }))
       const ordered = PATTERN_KEYS.filter(k => patterns.includes(k))
-      const sessionId = await createLoteriaSession(uid, { patterns: ordered, deck })
+      const config = { patterns: ordered, deck }
+      if (deck === CUSTOM_DECK_ID) {
+        const { cards, error: parseError } = parseCustomDeck(customText)
+        if (parseError) { setError(parseError); return }
+        config.customCards = cards
+      }
+      const sessionId = await createLoteriaSession(uid, config)
       await joinLoteriaPlayer(sessionId, uid, trimmed, true)
       localStorage.setItem(`lot_${sessionId}`, JSON.stringify({ uid, name: trimmed }))
       navigate(`/loteria/moderador/${sessionId}`)
@@ -251,12 +263,14 @@ export default function LoteriaSetup() {
         {/* Baraja */}
         <div className="bg-white/5 rounded-2xl px-5 py-4 border border-white/10">
           <p className="text-white font-semibold text-lg mb-1">¿Con qué baraja?</p>
-          <p className="text-white/40 text-xs mb-3">{DECKS[deck].tagline}</p>
+          <p className="text-white/40 text-xs mb-3">
+            {deck === CUSTOM_DECK_ID ? 'Escribe tus propias cartas' : DECKS[deck].tagline}
+          </p>
           <div className="flex flex-wrap gap-2">
             {DECK_IDS.map(id => (
               <button
                 key={id}
-                onClick={() => setDeck(id)}
+                onClick={() => { setDeck(id); setError('') }}
                 className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                   deck === id ? 'bg-amber-500 text-white' : 'bg-white/10 text-white/60 active:bg-white/20'
                 }`}
@@ -264,7 +278,40 @@ export default function LoteriaSetup() {
                 {DECKS[id].emoji} {DECKS[id].name}
               </button>
             ))}
+            <button
+              onClick={() => { setDeck(CUSTOM_DECK_ID); setError('') }}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                deck === CUSTOM_DECK_ID ? 'bg-amber-500 text-white' : 'bg-white/10 text-white/60 active:bg-white/20'
+              }`}
+            >
+              ✏️ Personalizada
+            </button>
           </div>
+
+          {deck === CUSTOM_DECK_ID && (
+            <div className="mt-4">
+              <textarea
+                value={customText}
+                onChange={e => { setCustomText(e.target.value); setError('') }}
+                rows={5}
+                placeholder={'El Taco, La Michelada, 🌮 Los Amigos…\n\nSepáralas con comas o saltos de línea.'}
+                className="w-full px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white text-sm placeholder-white/25 outline-none focus:border-amber-500 resize-none"
+              />
+              <p className={`text-xs mt-2 ${customCount >= MIN_CUSTOM_CARDS ? 'text-green-400' : 'text-white/40'}`}>
+                {customCount} carta{customCount !== 1 ? 's' : ''}
+                {customCount < MIN_CUSTOM_CARDS && ` · faltan ${MIN_CUSTOM_CARDS - customCount} para llenar una tabla`}
+              </p>
+              {customPreview.length > 0 && (
+                <p className="text-white/40 text-xs mt-1 truncate">
+                  {customPreview.map(c => `${c.emoji} ${c.name}`).join(' · ')}…
+                </p>
+              )}
+              <p className="text-white/30 text-[11px] mt-2 leading-snug">
+                Si escribes un emoji junto al nombre lo usamos; si no, le ponemos uno.
+                Las repetidas se ignoran.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Patrones ganadores */}

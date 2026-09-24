@@ -446,6 +446,9 @@ export async function createLoteriaSession(hostId, config) {
         phase: 'lobby',
         patterns: config.patterns,
         deck: config.deck,
+        // Una baraja personalizada vive aquí: meta es el nodo que la base deja
+        // leer, y así llega a todos los jugadores con la sala.
+        customCards: config.customCards ?? null,
         round: 1,
         winner: null,
       }

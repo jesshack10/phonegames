@@ -65,3 +65,21 @@ export function getDeck(deckId) {
 export function getDeckCard(deckId, cardId) {
   return getDeck(deckId).cards.find(c => c.id === cardId)
 }
+
+/**
+ * La baraja con la que se juega esta sala. Una baraja personalizada no está en
+ * el registro: la escribió quien creó la sala y viaja dentro de meta, que es el
+ * nodo que la base sí deja leer.
+ */
+export function resolveDeck(meta) {
+  if (meta?.deck === 'custom' && Array.isArray(meta.customCards) && meta.customCards.length) {
+    return {
+      id: 'custom',
+      name: meta.customName || 'Personalizada',
+      emoji: '✏️',
+      tagline: 'Baraja escrita para esta sala',
+      cards: meta.customCards,
+    }
+  }
+  return getDeck(meta?.deck)
+}
