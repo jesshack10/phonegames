@@ -464,28 +464,42 @@ export async function joinLoteriaPlayer(sessionId, uid, name, isHost = false) {
   })
 }
 
-export function subscribeLoteriaSession(sessionId, cb) {
+// onValue cancels its listener silently when a read is refused: no callback,
+// no throw, the value simply never arrives. Each subscription takes an onError
+// so a refused read looks different from "nothing has happened yet".
+export function subscribeLoteriaSession(sessionId, cb, onError) {
   const r = ref(db, `sessions/${sessionId}/meta`)
-  onValue(r, snap => cb(snap.val()))
+  onValue(r, snap => cb(snap.val()), e => {
+    console.error('leer la sala falló:', e)
+    onError?.(`la sala · ${e?.code || e?.message || e}`)
+  })
   return () => off(r)
 }
 
-export function subscribeLoteriaPlayers(sessionId, cb) {
+export function subscribeLoteriaPlayers(sessionId, cb, onError) {
   const r = ref(db, `sessions/${sessionId}/players`)
   onValue(r, snap => {
     const val = snap.val() || {}
     cb(Object.entries(val).map(([id, data]) => ({ id, ...data })))
+  }, e => {
+    console.error('leer jugadores falló:', e)
+    onError?.(`los jugadores · ${e?.code || e?.message || e}`)
   })
   return () => off(r)
 }
 
 // Cartas ya cantadas, en orden de salida. Los jugadores la usan sólo para
 // validar su "¡Lotería!"; su pantalla nunca la muestra.
-export function subscribeLoteriaDrawn(sessionId, cb) {
+export function subscribeLoteriaDrawn(sessionId, cb, onError) {
   const r = ref(db, `sessions/${sessionId}/drawn`)
   onValue(r, snap => {
     const val = snap.val()
     cb(Array.isArray(val) ? val.filter(v => v != null) : Object.values(val || {}))
+  }, e => {
+    // Without this the card is written and the screen never changes: the
+    // moderator taps a working button and sees absolutely nothing.
+    console.error('leer las cantadas falló:', e)
+    onError?.(`las cartas cantadas · ${e?.code || e?.message || e}`)
   })
   return () => off(r)
 }
@@ -497,7 +511,7 @@ export async function getLoteriaMeta(sessionId) {
 
 /** El mazo barajado de la ronda en curso (lo recupera el moderador al recargar). */
 export async function getLoteriaDeck(sessionId) {
-  const snap = await get(ref(db, `sessions/${sessionId}/deck`))
+  const snap = await stageRead('el mazo', () => get(ref(db, `sessions/${sessionId}/deck`)))
   return snap.val() || []
 }
 
@@ -506,6 +520,18 @@ export async function getLoteriaDeck(sessionId) {
  * y limpia marcas, cantadas y ganador. Sirve tanto para la primera partida como
  * para "Nueva ronda" — en ese caso se pasa el número de ronda siguiente.
  */
+// Same as stage(), for one-off reads.
+async function stageRead(label, run) {
+  try {
+    return await run()
+  } catch (e) {
+    const err = new Error(`${label} · ${e?.code || e?.message || e}`)
+    err.code = e?.code
+    err.stage = label
+    throw err
+  }
+}
+
 // Runs a write and, if the database refuses it, re-throws tagged with what was
 // being written. A bare "permission denied" doesn't say which node was
 // rejected, which is the difference between a fixable report and a dead end.
