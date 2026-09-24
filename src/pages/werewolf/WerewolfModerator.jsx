@@ -26,6 +26,8 @@ export default function WerewolfModerator() {
   const [votes, setVotes] = useState({})
   const [actionLog, setActionLog] = useState({})
   const [selectedElimination, setSelectedElimination] = useState(null)
+  const [starting, setStarting] = useState(false)
+  const [startError, setStartError] = useState('')
   const [nightResult, setNightResult] = useState(null)
 
   useEffect(() => {
@@ -60,11 +62,23 @@ export default function WerewolfModerator() {
 
   // ─── LOBBY ────────────────────────────────────────────────────────────────
   async function handleStartGame() {
-    const ids = gamePlayers.map(p => p.id)
-    const assignments = assignRoles(ids, meta.roleConfig)
-    await assignRolesToPlayers(sessionId, assignments)
-    await startGame(sessionId)
-    await appendActionLog(sessionId, meta.round, { type: 'game_start', payload: { description: 'Game started' } })
+    if (starting) return
+    setStarting(true)
+    setStartError('')
+    try {
+      const ids = gamePlayers.map(p => p.id)
+      const assignments = assignRoles(ids, meta.roleConfig)
+      await assignRolesToPlayers(sessionId, assignments)
+      await startGame(sessionId)
+      await appendActionLog(sessionId, meta.round, { type: 'game_start', payload: { description: 'Game started' } })
+    } catch (e) {
+      // There was no catch here at all: a refused write rejected into nowhere
+      // and the button simply did nothing.
+      console.error('start game failed:', e)
+      setStartError(`Couldn't start the game: ${e?.stage ? `${e.code || e.message} · ${e.stage}` : (e?.code || e?.message || 'unknown error')}`)
+    } finally {
+      setStarting(false)
+    }
   }
 
   // ─── ROLE REVEAL ──────────────────────────────────────────────────────────
@@ -219,12 +233,20 @@ export default function WerewolfModerator() {
         <>
           <p className="text-white/50 text-sm">{gamePlayers.length} player{gamePlayers.length !== 1 ? 's' : ''} joined</p>
           <PlayerList players={gamePlayers} />
+          {startError && (
+            <p className="w-full text-red-300 bg-red-500/10 border border-red-500/40 rounded-2xl px-4 py-3 text-sm text-center break-words">
+              {startError}
+            </p>
+          )}
+
           <button
             onClick={handleStartGame}
-            disabled={gamePlayers.length < 4}
+            disabled={gamePlayers.length < 4 || starting}
             className="w-full py-4 rounded-2xl bg-red-700 border border-red-500 text-white text-lg font-bold disabled:opacity-40 active:scale-95 transition-transform"
           >
-            {gamePlayers.length < 4 ? `Need ${4 - gamePlayers.length} more player${4 - gamePlayers.length !== 1 ? 's' : ''}` : 'Start Game →'}
+            {gamePlayers.length < 4
+              ? `Need ${4 - gamePlayers.length} more player${4 - gamePlayers.length !== 1 ? 's' : ''}`
+              : starting ? 'Starting…' : 'Start Game →'}
           </button>
         </>
       )}

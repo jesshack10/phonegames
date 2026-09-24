@@ -70,6 +70,7 @@ export default function ImpostorPlayer() {
   const [players, setPlayers] = useState([])
   const [revealed, setRevealed] = useState(false)
   const [resetting, setResetting] = useState(false)
+  const [resetError, setResetError] = useState('')
   const sessionExistedRef = useRef(false)
 
   const storageKey = `imp_${sessionId}`
@@ -117,9 +118,12 @@ export default function ImpostorPlayer() {
     if (resetting) return
     setResetting(true)
     try {
+      setResetError('')
       await resetImpostorGame(sessionId, players.map(p => p.id))
       navigate(`/impostor/host/${sessionId}`, { replace: true })
-    } catch {
+    } catch (e) {
+      console.error('reiniciar partida falló:', e)
+      setResetError(e?.code || e?.message || 'error desconocido')
       setResetting(false)
     }
   }
@@ -182,6 +186,11 @@ export default function ImpostorPlayer() {
         <p className="text-red-900 text-xs mb-6">{t.close}</p>
         {isHost && (
           <div className="w-full max-w-xs flex flex-col gap-3">
+            {resetError && (
+              <p className="text-red-300 bg-red-500/10 border border-red-500/40 rounded-xl px-3 py-2 text-xs text-center break-words">
+                {resetError}
+              </p>
+            )}
             <button
               onClick={handlePlayAgain}
               disabled={resetting}
@@ -229,6 +238,12 @@ export default function ImpostorPlayer() {
       <p className="text-green-950 text-xs mb-6">{t.close}</p>
       {isHost && (
         <div className="w-full max-w-xs flex flex-col gap-3">
+          {resetError && (
+            <p className="text-red-300 bg-red-500/10 border border-red-500/40 rounded-xl px-3 py-2 text-xs text-center break-words">
+              {resetError}
+            </p>
+          )}
+
           <button
             onClick={handlePlayAgain}
             disabled={resetting}

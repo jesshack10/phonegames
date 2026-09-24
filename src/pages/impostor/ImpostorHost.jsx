@@ -54,6 +54,7 @@ const T = {
     category: 'Category',
     all: 'All',
     exitGame: 'Exit game',
+    assignFailed: (why) => `Couldn't assign roles: ${why}`,
   },
   es: {
     waiting: 'Esperando jugadores…',
@@ -74,6 +75,7 @@ const T = {
     category: 'Categoría',
     all: 'Todas',
     exitGame: 'Salir del juego',
+    assignFailed: (why) => `No se pudieron asignar los roles: ${why}`,
   },
 }
 
@@ -84,6 +86,7 @@ export default function ImpostorHost() {
   const [meta, setMeta] = useState(null)
   const [players, setPlayers] = useState([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
   const [numImpostors, setNumImpostorsState] = useState(1)
   const [category, setCategoryState] = useState('Todas')
   const sessionExistedRef = useRef(false)
@@ -138,11 +141,15 @@ export default function ImpostorHost() {
   async function handleAssignRoles() {
     if (!canStart || loading) return
     setLoading(true)
+    setError('')
     try {
       const word = getRandomWord(category, lang)
       await assignImpostorRoles(sessionId, players.map(p => p.id), numImpostors, word)
       navigate(`/impostor/play/${sessionId}`, { replace: true })
-    } catch {
+    } catch (e) {
+      // Swallowing this left the button looking dead when the write was refused.
+      console.error('asignar roles falló:', e)
+      setError(t.assignFailed(e?.stage ? `${e.code || e.message} · ${e.stage}` : (e?.code || e?.message || '')))
       setLoading(false)
     }
   }
@@ -227,6 +234,12 @@ export default function ImpostorHost() {
 
       {!canStart && (
         <p className="text-white/40 text-sm text-center">{t.needMore(numImpostors)}</p>
+      )}
+
+      {error && (
+        <p className="w-full max-w-xs text-red-300 bg-red-500/10 border border-red-500/40 rounded-2xl px-4 py-3 text-sm text-center break-words">
+          {error}
+        </p>
       )}
 
       <button
