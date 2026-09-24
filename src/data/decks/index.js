@@ -83,3 +83,15 @@ export function resolveDeck(meta) {
   }
   return getDeck(meta?.deck)
 }
+
+/**
+ * ¿Este bundle conoce la baraja de la sala? Un teléfono con una versión vieja
+ * en caché no la reconoce y, sin esto, resolveDeck le devolvía la tradicional
+ * en silencio: la partida se veía bien pero con las cartas equivocadas.
+ */
+export function knowsDeck(meta) {
+  const id = meta?.deck
+  if (!id) return true                       // salas viejas, sin baraja guardada
+  if (id === 'custom') return Array.isArray(meta.customCards) && meta.customCards.length > 0
+  return Boolean(DECKS[id])
+}
