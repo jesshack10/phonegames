@@ -40,6 +40,7 @@ export default function LoteriaJugar() {
 
   // Llega dentro de meta; la pantalla nunca la muestra, sólo valida con ella.
   const drawn = normalizeDrawn(meta?.drawn)
+  const deckId = meta?.deck
   const me = players.find(p => p.id === uid)
   const board = me?.board
   const round = meta?.round ?? 1
@@ -142,7 +143,7 @@ export default function LoteriaJugar() {
         </p>
 
         <div className="w-full max-w-sm mt-2 opacity-60 pointer-events-none">
-          <LoteriaBoard board={board} marks={marks} disabled />
+          <LoteriaBoard board={board} deckId={deckId} marks={marks} disabled />
         </div>
 
         <div className="flex gap-1 mt-2">
@@ -175,7 +176,7 @@ export default function LoteriaJugar() {
       </div>
 
       <div className="w-full max-w-sm">
-        <LoteriaBoard board={board} marks={marks} onToggle={handleToggle} />
+        <LoteriaBoard board={board} deckId={deckId} marks={marks} onToggle={handleToggle} />
       </div>
 
       {falseAlarm && (

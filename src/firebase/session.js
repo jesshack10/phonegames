@@ -445,6 +445,7 @@ export async function createLoteriaSession(hostId, config) {
         game: 'loteria',
         phase: 'lobby',
         patterns: config.patterns,
+        deck: config.deck,
         round: 1,
         winner: null,
       }

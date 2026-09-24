@@ -9,6 +9,7 @@ import {
 } from '../../firebase/session.js'
 import { useAuth } from '../../hooks/useAuth.js'
 import { PATTERNS, PATTERN_KEYS } from '../../utils/loteria.js'
+import { DECKS, DECK_IDS, DEFAULT_DECK } from '../../data/decks/index.js'
 
 const SETTINGS_KEY = 'loteria_settings'
 
@@ -70,6 +71,7 @@ export default function LoteriaSetup() {
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
   const [patterns, setPatterns] = useState(['full'])
+  const [deck, setDeck] = useState(DEFAULT_DECK)
   const [step, setStep] = useState(null) // null | 'join' | 'create'
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -80,8 +82,9 @@ export default function LoteriaSetup() {
     const saved = localStorage.getItem(SETTINGS_KEY)
     if (!saved) return
     try {
-      const { patterns: p } = JSON.parse(saved)
+      const { patterns: p, deck: d } = JSON.parse(saved)
       if (Array.isArray(p) && p.length) setPatterns(p)
+      if (d && DECKS[d]) setDeck(d)
     } catch {}
   }, [])
 
@@ -113,9 +116,9 @@ export default function LoteriaSetup() {
     setLoading(true)
     setError('')
     try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ patterns }))
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ patterns, deck }))
       const ordered = PATTERN_KEYS.filter(k => patterns.includes(k))
-      const sessionId = await createLoteriaSession(uid, { patterns: ordered })
+      const sessionId = await createLoteriaSession(uid, { patterns: ordered, deck })
       await joinLoteriaPlayer(sessionId, uid, trimmed, true)
       localStorage.setItem(`lot_${sessionId}`, JSON.stringify({ uid, name: trimmed }))
       navigate(`/loteria/moderador/${sessionId}`)
@@ -243,6 +246,25 @@ export default function LoteriaSetup() {
           <div className="flex-1 h-px bg-white/10" />
           <p className="text-white/30 text-xs uppercase tracking-widest">o crea una sala</p>
           <div className="flex-1 h-px bg-white/10" />
+        </div>
+
+        {/* Baraja */}
+        <div className="bg-white/5 rounded-2xl px-5 py-4 border border-white/10">
+          <p className="text-white font-semibold text-lg mb-1">¿Con qué baraja?</p>
+          <p className="text-white/40 text-xs mb-3">{DECKS[deck].tagline}</p>
+          <div className="flex flex-wrap gap-2">
+            {DECK_IDS.map(id => (
+              <button
+                key={id}
+                onClick={() => setDeck(id)}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  deck === id ? 'bg-amber-500 text-white' : 'bg-white/10 text-white/60 active:bg-white/20'
+                }`}
+              >
+                {DECKS[id].emoji} {DECKS[id].name}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Patrones ganadores */}

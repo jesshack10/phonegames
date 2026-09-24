@@ -1,4 +1,5 @@
-import { getCard, cardGradient } from '../../data/loteria.js'
+import { cardGradient } from '../../data/loteria.js'
+import { getDeckCard } from '../../data/decks/index.js'
 
 /**
  * Una carta de la baraja. size:
@@ -6,13 +7,19 @@ import { getCard, cardGradient } from '../../data/loteria.js'
  *   'md' — casilla de la tabla del jugador
  *   'sm' — miniatura del historial de cantadas
  */
-export function LoteriaCard({ id, size = 'md', marked = false, dimmed = false, onClick }) {
-  const card = getCard(id)
+export function LoteriaCard({ id, deckId, size = 'md', marked = false, dimmed = false, onClick }) {
+  const card = getDeckCard(deckId, id)
   if (!card) return null
+
+  // Las barajas temáticas traen nombres mucho más largos que la tradicional
+  // ("La Inteligencia Artificial" contra "El Gallo"), así que en la tabla el
+  // texto se encoge según lo que mida en vez de recortarse a media palabra.
+  const len = card.name.length
+  const mdName = len > 18 ? 'text-[8px]' : len > 12 ? 'text-[9px]' : 'text-[10px]'
 
   const S = {
     xl: { box: 'rounded-3xl p-6 gap-2', emoji: 'text-8xl', name: 'text-2xl', num: 'text-sm', bean: 'w-1/4' },
-    md: { box: 'rounded-xl p-1.5 gap-0.5', emoji: 'text-3xl', name: 'text-[10px] leading-tight', num: 'text-[10px]', bean: 'w-[34%]' },
+    md: { box: 'rounded-xl p-1 gap-0.5', emoji: len > 12 ? 'text-2xl' : 'text-3xl', name: `${mdName} leading-[1.1] break-words line-clamp-3`, num: 'text-[10px]', bean: 'w-[34%]' },
     sm: { box: 'rounded-lg p-1 gap-0', emoji: 'text-xl', name: 'hidden', num: 'text-[8px]', bean: 'w-[38%]' },
   }[size]
 
