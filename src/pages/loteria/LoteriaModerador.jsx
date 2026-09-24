@@ -8,14 +8,16 @@ import {
   setPlayerTeam,
   drawLoteriaCard,
   updateLoteriaMeta,
+  addLoteriaPoint,
   deleteSession,
   SESSION_TTL,
 } from '../../firebase/session.js'
 import { useAuth } from '../../hooks/useAuth.js'
 import ShareSessionLink from '../../components/ShareSessionLink.jsx'
 import { LoteriaCard, LoteriaCardPlaceholder } from '../../components/loteria/LoteriaCard.jsx'
-import { pickNextCard, normalizeDrawn, dealBoards, deckSize, findCard, assignTeamsRandomly,
-         teamInfo, scoreKeyFor, TEAMS, PATTERNS, PATTERN_KEYS } from '../../utils/loteria.js'
+import { pickNextCard, normalizeDrawn, dealBoards, generateBoard, deckSize, findCard,
+         assignTeamsRandomly, couplesFrom, teamInfo, scoreKeyFor, TEAMS,
+         PATTERNS, PATTERN_KEYS } from '../../utils/loteria.js'
 import { resolveDeck } from '../../data/decks/index.js'
 
 // Firebase puts the useful part in `code` (PERMISSION_DENIED and friends);
@@ -37,6 +39,7 @@ export default function LoteriaModerador() {
   const [error, setError] = useState('')
   const [readError, setReadError] = useState('')
   const [showHistory, setShowHistory] = useState(false)
+  const [now, setNow] = useState(Date.now())
   const sessionExistedRef = useRef(false)
 
   useEffect(() => {
@@ -70,10 +73,27 @@ export default function LoteriaModerador() {
   const currentId = drawnCount ? drawn[drawnCount - 1] : null
   const deckEmpty = drawnCount >= totalCards
   const isTeams = meta?.mode === 'teams'
+  // Matrimonios: el jugador es la pareja. Sólo cuentan las confirmadas —
+  // quien no tiene con quién no puede jugar, así que la sala no arranca
+  // hasta que todos estén emparejados.
+  const isPairs = meta?.mode === 'parejas'
+  const couples = isPairs ? couplesFrom(players) : []
+  const sinPareja = isPairs ? guests.filter(p => !couples.some(c => c.a === p.id || c.b === p.id)) : []
   const teamCount = meta?.teamCount ?? 2
   const winners = Object.entries(meta?.winners ?? {}).map(([id, w]) => ({ id, ...w }))
   const winner = winners[0] ?? null
   const lobbyUrl = `${window.location.origin}${window.location.pathname}#/loteria/sala/${sessionId}`
+
+  // Reloj de la carta. Todos cuentan desde meta.drawnAt, el mismo número para
+  // todos, así que el tiempo que ve el moderador es el que ven los jugadores.
+  const timer = meta?.timer ?? 0
+  const deadline = timer && meta?.drawnAt ? meta.drawnAt + timer * 1000 : 0
+  const secondsLeft = deadline ? Math.max(0, Math.ceil((deadline - now) / 1000)) : null
+  useEffect(() => {
+    if (!deadline) return
+    const t = setInterval(() => setNow(Date.now()), 500)
+    return () => clearInterval(t)
+  }, [deadline])
 
   async function handleTogglePattern(key) {
     const next = patterns.includes(key)
@@ -88,20 +108,26 @@ export default function LoteriaModerador() {
     setError('')
     try {
       const ids = guests.map(p => p.id)
-      const boards = dealBoards(deck, ids)
+      // Con matrimonios la tabla es de la pareja: los dos celulares leen la
+      // misma. Sin parejas, una tabla por persona como siempre.
+      const boards = isPairs ? {} : dealBoards(deck, ids)
+      const parejas = isPairs
+        ? Object.fromEntries(couples.map(c => [c.id, { board: generateBoard(deck), names: c.names }]))
+        : null
 
-      // Un punto por ronda ganada. Se otorga aquí, al cerrar la ronda anterior:
-      // para entonces ya no llegan más reclamos y hay un único escritor.
-      const scores = { ...(meta.scores ?? {}) }
+      // Un punto por ronda ganada. Se suma por transacción y no dentro del
+      // reparto: durante la ronda las parejas apuntan sus propios aciertos, y
+      // un leer-y-escribir de todo el marcador se llevaría los suyos por
+      // delante.
       const claves = new Set(winners.map(w => scoreKeyFor(meta.mode, w.id, w.team)))
-      for (const k of claves) scores[k] = (scores[k] ?? 0) + 1
+      for (const k of claves) await addLoteriaPoint(sessionId, k)
 
       // "Al azar" rebaraja los equipos en cada ronda; "yo los asigno" los respeta.
       const teams = isTeams && meta.teamAssign === 'random'
         ? assignTeamsRandomly(ids, teamCount)
         : null
 
-      await startLoteriaRound(sessionId, boards, round, { scores }, teams)
+      await startLoteriaRound(sessionId, boards, round, {}, teams, parejas)
     } catch (e) {
       // This write is atomic: one rejected path and the round never starts, so
       // swallowing it left the moderator tapping a button that did nothing.
@@ -138,7 +164,11 @@ export default function LoteriaModerador() {
     const base = { ...(meta?.scores ?? {}) }
     const pendientes = new Set(winners.map(w => scoreKeyFor(meta?.mode, w.id, w.team)))
     const rows = []
-    if (isTeams) {
+    if (isPairs) {
+      for (const c of couples) {
+        rows.push({ key: c.id, label: `💍 ${c.names}`, points: (base[c.id] ?? 0) + (pendientes.has(c.id) ? 1 : 0) })
+      }
+    } else if (isTeams) {
       for (const t of TEAMS.slice(0, teamCount)) {
         const key = `t${t.id}`
         rows.push({ key, label: `${t.emoji} ${t.name}`, points: (base[key] ?? 0) + (pendientes.has(key) ? 1 : 0) })
@@ -224,13 +254,21 @@ export default function LoteriaModerador() {
           <p className="text-white font-semibold mb-1">Baraja</p>
           <p className="text-white/60 text-sm">{deck.emoji} {deck.name} · {totalCards} cartas</p>
           {deck.hasPrompts && (
-            <p className="text-white/40 text-xs mt-1">Al cantar cada carta te aparecerá una pregunta para leer en voz alta.</p>
+            <p className="text-white/40 text-xs mt-1">
+              {isPairs
+                ? 'Tú cantas y lees la pregunta. Cada matrimonio la contesta en su celular: uno escribe y el otro adivina.'
+                : 'Al cantar cada carta te aparecerá una pregunta para leer en voz alta.'}
+            </p>
           )}
         </div>
 
         <div className="w-full max-w-xs bg-white/5 rounded-2xl px-5 py-4 border border-white/10">
           <p className="text-white font-semibold mb-1">¿Cómo se gana?</p>
-          <p className="text-white/40 text-xs mb-3">Gana quien complete cualquiera de los elegidos</p>
+          <p className="text-white/40 text-xs mb-3">
+            {isPairs
+              ? 'La casilla se gana adivinando, así que la tabla llena casi nunca sale.'
+              : 'Gana quien complete cualquiera de los elegidos'}
+          </p>
           <div className="flex flex-wrap gap-2">
             {PATTERN_KEYS.map(key => (
               <button
@@ -247,6 +285,32 @@ export default function LoteriaModerador() {
             ))}
           </div>
         </div>
+
+        {isPairs && (
+          <div className="w-full max-w-xs bg-white/5 rounded-2xl px-5 py-4 border border-white/10">
+            <p className="text-white font-semibold mb-1">Matrimonios</p>
+            <p className="text-white/40 text-xs mb-3">
+              Cada quien escoge a su pareja desde su celular. Comparten una tabla.
+            </p>
+            {couples.length === 0 ? (
+              <p className="text-white/30 text-sm">Todavía no hay parejas confirmadas.</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {couples.map(c => (
+                  <div key={c.id} className="flex items-center gap-2 bg-green-500/10 border border-green-500/30 rounded-xl px-3 py-2">
+                    <span className="shrink-0">💍</span>
+                    <span className="text-white/80 text-sm truncate">{c.names}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {sinPareja.length > 0 && (
+              <p className="text-amber-300 text-xs mt-3">
+                Falta emparejar: {sinPareja.map(p => p.name).join(', ')}
+              </p>
+            )}
+          </div>
+        )}
 
         {isTeams && meta.teamAssign === 'manual' && guests.length > 0 && (
           <div className="w-full max-w-xs bg-white/5 rounded-2xl px-5 py-4 border border-white/10">
@@ -274,12 +338,20 @@ export default function LoteriaModerador() {
           </div>
         )}
 
-        {isTeams && (
+        {(isTeams || isPairs) && (
           <Standings />
         )}
 
         {!canStart && (
           <p className="text-white/40 text-sm text-center">Se necesita al menos 1 jugador para empezar</p>
+        )}
+
+        {canStart && isPairs && (couples.length === 0 || sinPareja.length > 0) && (
+          <p className="text-white/40 text-sm text-center">
+            {couples.length === 0
+              ? 'Falta que se emparejen desde su celular para poder repartir'
+              : 'Todos tienen que tener pareja antes de repartir'}
+          </p>
         )}
 
         {(error || readError) && (
@@ -290,7 +362,7 @@ export default function LoteriaModerador() {
 
         <button
           onClick={() => handleStart(meta.round ?? 1)}
-          disabled={!canStart || busy}
+          disabled={!canStart || busy || (isPairs && (couples.length === 0 || sinPareja.length > 0))}
           className="w-full max-w-xs py-5 rounded-2xl bg-amber-500 active:bg-amber-600 text-white font-black text-xl tracking-wide shadow-lg shadow-amber-500/20 disabled:opacity-40 transition-colors"
         >
           {busy ? 'Repartiendo…' : 'Repartir y empezar →'}
@@ -371,13 +443,43 @@ export default function LoteriaModerador() {
               : <LoteriaCardPlaceholder />}
           </div>
 
-          {deck.hasPrompts && currentId && (
-            <div className="w-full max-w-sm rounded-2xl bg-amber-500/10 border border-amber-500/40 px-4 py-3">
-              <p className="text-amber-300/60 text-[11px] uppercase tracking-widest mb-1 text-center">Lee esto en voz alta</p>
-              <p className="text-white text-base text-center leading-snug">
-                {findCard(deck, currentId)?.prompt}
-              </p>
+          {deck.hasPrompts && currentId && (() => {
+            const card = findCard(deck, currentId)
+            const esReto = card?.kind === 'reto'
+            return (
+              <div className="w-full max-w-sm rounded-2xl bg-amber-500/10 border border-amber-500/40 px-4 py-3">
+                <p className="text-amber-300/60 text-[11px] uppercase tracking-widest mb-1 text-center">
+                  {esReto ? 'Reto · léelo en voz alta' : 'Lee esto en voz alta'}
+                </p>
+                <p className="text-white text-base text-center leading-snug">{card?.prompt}</p>
+                {isPairs && !esReto && (
+                  <p className="text-amber-300/50 text-[11px] text-center mt-2">
+                    A uno de cada matrimonio le salió para escribir; al otro, para adivinar.
+                  </p>
+                )}
+              </div>
+            )
+          })()}
+
+          {secondsLeft != null && currentId && (
+            <div className={`w-full max-w-sm rounded-2xl px-4 py-2 text-center border ${
+              secondsLeft === 0
+                ? 'bg-red-500/10 border-red-500/40 text-red-300'
+                : secondsLeft <= 10
+                  ? 'bg-red-500/10 border-red-500/40 text-red-300'
+                  : 'bg-white/5 border-white/10 text-white/60'
+            }`}>
+              <span className="font-mono font-bold text-lg">
+                {secondsLeft === 0 ? 'Se acabó el tiempo' : `${secondsLeft}s`}
+              </span>
             </div>
+          )}
+
+          {isPairs && currentId && (
+            <p className="text-white/40 text-sm">
+              {couples.filter(c => meta.turnos?.[c.id]?.index === drawnCount - 1 && meta.turnos[c.id]?.phase === 'done').length}
+              {' de '}{couples.length} matrimonio{couples.length !== 1 ? 's' : ''} ya cerró esta carta
+            </p>
           )}
 
           <p className="text-white/40 text-sm">
@@ -434,21 +536,35 @@ export default function LoteriaModerador() {
       {/* Jugadores */}
       <div className="w-full max-w-sm">
         <p className="text-white/40 text-xs uppercase tracking-widest mb-2 text-center">
-          {guests.length} jugando
+          {isPairs ? `${couples.length} matrimonio${couples.length !== 1 ? 's' : ''} jugando` : `${guests.length} jugando`}
         </p>
         <div className="flex flex-wrap gap-2 justify-center">
-          {guests.map(p => {
-            const t = isTeams ? teamInfo(p.team) : null
-            return (
-              <span key={p.id} className="px-3 py-1.5 rounded-full bg-white/5 text-white/70 text-sm">
-                {t && <span className="mr-1">{t.emoji}</span>}
-                {p.name}
-                <span className="text-white/30 ml-1.5">
-                  {Object.keys(p.marks || {}).length}
-                </span>
-              </span>
-            )
-          })}
+          {isPairs
+            ? couples.map(c => {
+                const turno = meta.turnos?.[c.id]
+                const enEsta = turno?.index === drawnCount - 1
+                const estado = !enEsta ? '…' : turno.phase === 'done' ? (turno.ok ? '✅' : '❌') : '✍️'
+                return (
+                  <span key={c.id} className="px-3 py-1.5 rounded-full bg-white/5 text-white/70 text-sm">
+                    {estado} {c.names}
+                    <span className="text-white/30 ml-1.5">
+                      {Object.keys(meta.parejas?.[c.id]?.marks || {}).length}
+                    </span>
+                  </span>
+                )
+              })
+            : guests.map(p => {
+                const t = isTeams ? teamInfo(p.team) : null
+                return (
+                  <span key={p.id} className="px-3 py-1.5 rounded-full bg-white/5 text-white/70 text-sm">
+                    {t && <span className="mr-1">{t.emoji}</span>}
+                    {p.name}
+                    <span className="text-white/30 ml-1.5">
+                      {Object.keys(p.marks || {}).length}
+                    </span>
+                  </span>
+                )
+              })}
         </div>
       </div>
 

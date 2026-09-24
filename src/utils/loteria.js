@@ -173,3 +173,62 @@ export function checkTeamWin(players, teamId, drawnIds, patternKeys, rule) {
 export function scoreKeyFor(mode, uid, teamId) {
   return mode === 'teams' && teamId != null ? `t${teamId}` : uid
 }
+
+// ─── Matrimonios ─────────────────────────────────────────────────────────────
+// En este modo el jugador no es la persona: es el matrimonio. Los dos celulares
+// ven la misma tabla y ganan juntos, así que todo lo de abajo trabaja con la
+// pareja como unidad y sólo baja a la persona para decidir a quién le toca
+// escribir y a quién adivinar.
+
+/**
+ * El identificador de una pareja. Se ordenan los dos uid antes de unirlos para
+ * que los dos teléfonos lleguen a la misma clave sin ponerse de acuerdo.
+ */
+export function coupleId(a, b) {
+  return [a, b].sort().join('~')
+}
+
+/**
+ * Las parejas confirmadas de la sala. Una pareja existe sólo cuando los dos se
+ * escogieron: si A escogió a B pero B todavía no, no hay pareja — así nadie
+ * queda emparejado por error con quien tocó primero la pantalla.
+ */
+export function couplesFrom(players) {
+  const byId = new Map((players || []).map(p => [p.id, p]))
+  const seen = new Set()
+  const out = []
+  for (const p of players || []) {
+    if (p.isHost || !p.pair || seen.has(p.id)) continue
+    const other = byId.get(p.pair)
+    if (!other || other.isHost || other.pair !== p.id) continue
+    seen.add(p.id)
+    seen.add(other.id)
+    const [a, b] = [p, other].sort((x, y) => (x.id < y.id ? -1 : 1))
+    out.push({ id: coupleId(a.id, b.id), a: a.id, b: b.id, names: `${a.name} y ${b.name}`, members: [a, b] })
+  }
+  return out
+}
+
+/** La pareja a la que pertenece este uid, o null si todavía no tiene. */
+export function coupleOf(players, uid) {
+  return couplesFrom(players).find(c => c.a === uid || c.b === uid) ?? null
+}
+
+/**
+ * A quién le toca escribir en esta carta. Alterna por número de carta cantada,
+ * así que sale de la nada que ya tienen los dos teléfonos: nadie lo escribe en
+ * la base y no hay forma de que se desincronicen.
+ */
+export function writerFor(couple, cardIndex) {
+  if (!couple) return null
+  return cardIndex % 2 === 0 ? couple.a : couple.b
+}
+
+/** Cuánto tiempo hay por carta. 0 es sin límite. */
+export const TURN_TIMERS = [0, 30, 60, 90]
+export const DEFAULT_TIMER = 0
+
+/** En qué casilla de la tabla cae esta carta, o -1 si no está. */
+export function boardIndexOf(board, cardId) {
+  return Array.isArray(board) ? board.indexOf(cardId) : -1
+}
