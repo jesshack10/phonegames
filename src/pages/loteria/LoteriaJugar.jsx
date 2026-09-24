@@ -3,14 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   subscribeLoteriaSession,
   subscribeLoteriaPlayers,
-  subscribeLoteriaDrawn,
   setLoteriaMark,
   declareLoteriaWinner,
   SESSION_TTL,
 } from '../../firebase/session.js'
 import { useAuth } from '../../hooks/useAuth.js'
 import { LoteriaBoard } from '../../components/loteria/LoteriaBoard.jsx'
-import { checkWin, PATTERNS } from '../../utils/loteria.js'
+import { checkWin, normalizeDrawn, PATTERNS } from '../../utils/loteria.js'
 
 function buzz(ms) {
   try { navigator.vibrate?.(ms) } catch {}
@@ -22,7 +21,6 @@ export default function LoteriaJugar() {
   const { uid } = useAuth()
   const [meta, setMeta] = useState(null)
   const [players, setPlayers] = useState([])
-  const [drawn, setDrawn] = useState([])
   const [marks, setMarks] = useState({})
   const [falseAlarm, setFalseAlarm] = useState(false)
   const [claiming, setClaiming] = useState(false)
@@ -35,12 +33,13 @@ export default function LoteriaJugar() {
   useEffect(() => {
     const u1 = subscribeLoteriaSession(sessionId, setMeta)
     const u2 = subscribeLoteriaPlayers(sessionId, setPlayers)
-    const u3 = subscribeLoteriaDrawn(sessionId, setDrawn)
-    return () => { u1(); u2(); u3() }
+    return () => { u1(); u2() }
   }, [sessionId])
 
   useEffect(() => () => clearTimeout(alarmTimerRef.current), [])
 
+  // Llega dentro de meta; la pantalla nunca la muestra, sólo valida con ella.
+  const drawn = normalizeDrawn(meta?.drawn)
   const me = players.find(p => p.id === uid)
   const board = me?.board
   const round = meta?.round ?? 1

@@ -51,9 +51,34 @@ export function shuffle(arr) {
   return out
 }
 
-/** A freshly shuffled deck of all 54 card ids. */
-export function buildDeck() {
-  return shuffle(LOTERIA_CARDS.map(c => c.id))
+/**
+ * The next card to call: uniformly random among those not called yet.
+ *
+ * There is deliberately no stored deck. Drawing from what's left gives the
+ * same distribution as shuffling upfront, and leaves nothing for a player's
+ * device to read ahead — the next card doesn't exist until it's called.
+ * Returns null once all 54 are out.
+ */
+export function pickNextCard(drawnIds) {
+  const drawn = drawnIds instanceof Set ? drawnIds : new Set(drawnIds || [])
+  const remaining = LOTERIA_CARDS.map(c => c.id).filter(id => !drawn.has(id))
+  if (!remaining.length) return null
+  return remaining[Math.floor(Math.random() * remaining.length)]
+}
+
+/**
+ * Firebase hands back a list as an array when its keys run 0..n and as an
+ * object otherwise. Callers just want the called cards in order.
+ */
+export function normalizeDrawn(value) {
+  if (Array.isArray(value)) return value.filter(v => v != null)
+  if (value && typeof value === 'object') {
+    return Object.keys(value)
+      .sort((a, b) => Number(a) - Number(b))
+      .map(k => value[k])
+      .filter(v => v != null)
+  }
+  return []
 }
 
 /** A random 4x4 board: 16 distinct card ids out of the 54. */
