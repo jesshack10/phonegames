@@ -497,20 +497,41 @@ export async function getLoteriaDeck(sessionId) {
  * para "Nueva ronda" — en ese caso se pasa el número de ronda siguiente.
  */
 export async function startLoteriaRound(sessionId, deck, boards, round) {
-  const updates = {
-    [`sessions/${sessionId}/deck`]: deck,
-    [`sessions/${sessionId}/drawn`]: null,
-    [`sessions/${sessionId}/claims`]: null,
-    [`sessions/${sessionId}/meta/phase`]: 'active',
-    [`sessions/${sessionId}/meta/round`]: round,
-    [`sessions/${sessionId}/meta/drawnCount`]: 0,
-    [`sessions/${sessionId}/meta/winner`]: null,
+  // This used to be one atomic multi-path update. When the database refused a
+  // single path the whole round silently failed to start, and nothing said
+  // which path it was. Writing in stages names the one that fails.
+  //
+  // The phase flip goes last on purpose: if any earlier write is refused the
+  // room stays in the lobby rather than landing in a half-started round.
+  const stage = async (label, run) => {
+    try {
+      await run()
+    } catch (e) {
+      const err = new Error(`${label} · ${e?.code || e?.message || e}`)
+      err.code = e?.code
+      err.stage = label
+      throw err
+    }
   }
+
+  await stage('mazo', () => set(ref(db, `sessions/${sessionId}/deck`), deck))
+  await stage('cantadas', () => remove(ref(db, `sessions/${sessionId}/drawn`)))
+  await stage('reclamos', () => remove(ref(db, `sessions/${sessionId}/claims`)))
+
   for (const [playerId, board] of Object.entries(boards)) {
-    updates[`sessions/${sessionId}/players/${playerId}/board`] = board
-    updates[`sessions/${sessionId}/players/${playerId}/marks`] = null
+    await stage('tablas', () =>
+      update(ref(db, `sessions/${sessionId}/players/${playerId}`), { board, marks: null })
+    )
   }
-  await update(ref(db), updates)
+
+  await stage('estado de la ronda', () =>
+    update(ref(db, `sessions/${sessionId}/meta`), {
+      phase: 'active',
+      round,
+      drawnCount: 0,
+      winner: null,
+    })
+  )
 }
 
 /** Canta la siguiente carta del mazo. index es cuántas se habían cantado ya. */

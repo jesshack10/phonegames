@@ -18,9 +18,12 @@ import { LoteriaCard, LoteriaCardPlaceholder } from '../../components/loteria/Lo
 import { buildDeck, dealBoards, PATTERNS, PATTERN_KEYS, TOTAL_CARDS } from '../../utils/loteria.js'
 
 // Firebase puts the useful part in `code` (PERMISSION_DENIED and friends);
-// without it a rejected write reads as nothing happening at all.
+// without it a rejected write reads as nothing happening at all. Dealing a
+// round writes in stages and tags its error with the one that failed, which is
+// what turns "permission denied" into something actionable.
 function describe(e) {
-  return e?.code || e?.message || 'error desconocido'
+  const reason = e?.code || e?.message || 'error desconocido'
+  return e?.stage ? `${reason} al escribir ${e.stage}` : reason
 }
 
 export default function LoteriaModerador() {
