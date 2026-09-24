@@ -8,7 +8,7 @@ import {
   SESSION_TTL,
 } from '../../firebase/session.js'
 import { useAuth } from '../../hooks/useAuth.js'
-import { PATTERNS, PATTERN_KEYS } from '../../utils/loteria.js'
+import { PATTERNS, PATTERN_KEYS, MIN_TEAMS, MAX_TEAMS, TEAMS } from '../../utils/loteria.js'
 import { DECKS, DECK_IDS, DEFAULT_DECK } from '../../data/decks/index.js'
 import { parseCustomDeck, CUSTOM_DECK_ID, MIN_CUSTOM_CARDS } from '../../data/decks/custom.js'
 
@@ -74,6 +74,10 @@ export default function LoteriaSetup() {
   const [patterns, setPatterns] = useState(['full'])
   const [deck, setDeck] = useState(DEFAULT_DECK)
   const [customText, setCustomText] = useState('')
+  const [mode, setMode] = useState('individual')
+  const [teamCount, setTeamCount] = useState(2)
+  const [teamAssign, setTeamAssign] = useState('random')
+  const [teamWin, setTeamWin] = useState('first')
   const [step, setStep] = useState(null) // null | 'join' | 'create'
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -88,7 +92,11 @@ export default function LoteriaSetup() {
     const saved = localStorage.getItem(SETTINGS_KEY)
     if (!saved) return
     try {
-      const { patterns: p, deck: d } = JSON.parse(saved)
+      const { patterns: p, deck: d, mode: m, teamCount: tc, teamAssign: ta, teamWin: tw } = JSON.parse(saved)
+      if (m === 'teams' || m === 'individual') setMode(m)
+      if (tc >= MIN_TEAMS && tc <= MAX_TEAMS) setTeamCount(tc)
+      if (ta === 'random' || ta === 'manual') setTeamAssign(ta)
+      if (tw === 'first' || tw === 'all') setTeamWin(tw)
       if (Array.isArray(p) && p.length) setPatterns(p)
       if (d && (DECKS[d] || d === CUSTOM_DECK_ID)) setDeck(d)
     } catch {}
@@ -122,9 +130,10 @@ export default function LoteriaSetup() {
     setLoading(true)
     setError('')
     try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ patterns, deck }))
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ patterns, deck, mode, teamCount, teamAssign, teamWin }))
       const ordered = PATTERN_KEYS.filter(k => patterns.includes(k))
-      const config = { patterns: ordered, deck }
+      const config = { patterns: ordered, deck, mode }
+      if (mode === 'teams') Object.assign(config, { teamCount, teamAssign, teamWin })
       if (deck === CUSTOM_DECK_ID) {
         const { cards, error: parseError } = parseCustomDeck(customText)
         if (parseError) { setError(parseError); return }
@@ -333,6 +342,87 @@ export default function LoteriaSetup() {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Individual o por equipos */}
+        <div className="bg-white/5 rounded-2xl px-5 py-4 border border-white/10">
+          <p className="text-white font-semibold text-lg mb-3">¿Cómo se juega?</p>
+          <div className="flex gap-2">
+            {[['individual', '👤 Individual'], ['teams', '👥 Por equipos']].map(([val, label]) => (
+              <button
+                key={val}
+                onClick={() => setMode(val)}
+                className={`flex-1 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+                  mode === val ? 'bg-amber-500 text-white' : 'bg-white/10 text-white/60 active:bg-white/20'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {mode === 'teams' && (
+            <div className="mt-4 flex flex-col gap-4">
+              <div>
+                <p className="text-white/60 text-sm mb-2">¿Cuántos equipos?</p>
+                <div className="flex gap-2">
+                  {Array.from({ length: MAX_TEAMS - MIN_TEAMS + 1 }, (_, i) => MIN_TEAMS + i).map(n => (
+                    <button
+                      key={n}
+                      onClick={() => setTeamCount(n)}
+                      className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${
+                        teamCount === n ? 'bg-amber-500 text-white' : 'bg-white/10 text-white/60 active:bg-white/20'
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-white/30 text-xs mt-1.5">
+                  {TEAMS.slice(0, teamCount).map(t => `${t.emoji} ${t.name}`).join(' · ')}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-white/60 text-sm mb-2">¿Cómo se arman?</p>
+                <div className="flex gap-2">
+                  {[['random', 'Al azar'], ['manual', 'Yo los asigno']].map(([val, label]) => (
+                    <button
+                      key={val}
+                      onClick={() => setTeamAssign(val)}
+                      className={`flex-1 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+                        teamAssign === val ? 'bg-amber-500 text-white' : 'bg-white/10 text-white/60 active:bg-white/20'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-white/60 text-sm mb-2">¿Cuándo gana el equipo?</p>
+                <div className="flex gap-2">
+                  {[['first', 'Con uno'], ['all', 'Con todos']].map(([val, label]) => (
+                    <button
+                      key={val}
+                      onClick={() => setTeamWin(val)}
+                      className={`flex-1 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+                        teamWin === val ? 'bg-amber-500 text-white' : 'bg-white/10 text-white/60 active:bg-white/20'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-white/30 text-xs mt-1.5">
+                  {teamWin === 'first'
+                    ? 'Basta que un integrante complete el patrón.'
+                    : 'Todos los del equipo tienen que completarlo.'}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         <button

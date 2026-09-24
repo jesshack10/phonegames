@@ -4,12 +4,12 @@ import {
   subscribeLoteriaSession,
   subscribeLoteriaPlayers,
   setLoteriaMark,
-  declareLoteriaWinner,
+  claimLoteriaWin,
   SESSION_TTL,
 } from '../../firebase/session.js'
 import { useAuth } from '../../hooks/useAuth.js'
 import { LoteriaBoard } from '../../components/loteria/LoteriaBoard.jsx'
-import { checkWin, normalizeDrawn, PATTERNS } from '../../utils/loteria.js'
+import { checkWin, normalizeDrawn, checkTeamWin, teamInfo, PATTERNS } from '../../utils/loteria.js'
 import { resolveDeck } from '../../data/decks/index.js'
 
 function buzz(ms) {
@@ -46,8 +46,11 @@ export default function LoteriaJugar() {
   const board = me?.board
   const round = meta?.round ?? 1
   const patterns = meta?.patterns ?? ['full']
-  const winner = meta?.winner
-  const iWon = winner?.uid === uid
+  const winners = Object.entries(meta?.winners ?? {}).map(([id, w]) => ({ id, ...w }))
+  const winner = winners[0] ?? null
+  const iWon = winners.some(w => w.id === uid) ||
+    (meta?.mode === 'teams' && me?.team != null && winners.some(w => w.team === me.team))
+  const myTeam = meta?.mode === 'teams' ? teamInfo(me?.team) : null
 
   // Sin registro local no debería estar aquí: mándalo a la pantalla de entrada
   useEffect(() => {
@@ -94,9 +97,12 @@ export default function LoteriaJugar() {
     if (claiming || winner || !board) return
     setClaiming(true)
     const pattern = checkWin(board, marks, drawn, patterns)
-    if (!pattern) {
+    // Con equipos "con todos", tener uno mismo el patrón no basta.
+    const teamOk = meta?.mode !== 'teams' ||
+      checkTeamWin(players, me?.team, drawn, patterns, meta?.teamWin)
+    if (!pattern || !teamOk) {
       buzz([40, 60, 40])
-      setFalseAlarm(true)
+      setFalseAlarm(pattern && !teamOk ? 'team' : true)
       clearTimeout(alarmTimerRef.current)
       alarmTimerRef.current = setTimeout(() => setFalseAlarm(false), 3000)
       setClaiming(false)
@@ -104,7 +110,11 @@ export default function LoteriaJugar() {
     }
     buzz([30, 40, 30, 40, 120])
     try {
-      await declareLoteriaWinner(sessionId, uid, me?.name ?? 'Jugador', pattern)
+      await claimLoteriaWin(
+        sessionId,
+        { uid, name: me?.name ?? 'Jugador', team: me?.team ?? null, pattern },
+        drawn.length,
+      )
     } catch {
       setFalseAlarm(true)
     } finally {
@@ -134,8 +144,20 @@ export default function LoteriaJugar() {
       <div className="min-h-screen bg-[#0a0a18] flex flex-col items-center px-6 py-10 gap-5">
         <div className="text-7xl mt-8">{iWon ? '🏆' : '🃏'}</div>
         <h1 className="text-white text-3xl font-black text-center">
-          {iWon ? '¡GANASTE!' : `¡${winner.name} ganó!`}
+          {iWon
+            ? '¡GANASTE!'
+            : winners.length > 1
+              ? `¡Empate: ${winners.map(w => w.name).join(' y ')}!`
+              : `¡${winner.name} ganó!`}
         </h1>
+        {meta?.mode === 'teams' && (
+          <p className="text-white/60 text-sm">
+            {[...new Set(winners.map(w => w.team))]
+              .map(t => { const i = teamInfo(t); return i ? `${i.emoji} Equipo ${i.name}` : '' })
+              .filter(Boolean)
+              .join(' y ')}
+          </p>
+        )}
         <p className="text-amber-300 font-semibold">
           {PATTERNS[winner.pattern]?.label ?? winner.pattern}
         </p>
@@ -165,6 +187,11 @@ export default function LoteriaJugar() {
     <div className="min-h-screen bg-[#0a0a18] flex flex-col items-center px-4 py-5 gap-3">
       <div className="w-full max-w-sm flex items-center justify-between">
         <span className="text-white/40 text-xs uppercase tracking-widest">Ronda {round}</span>
+        {myTeam && (
+          <span className={`px-2 py-0.5 rounded-full border text-xs font-semibold ${myTeam.chip}`}>
+            {myTeam.emoji} {myTeam.name}
+          </span>
+        )}
         <span className="text-white/40 text-xs">{markedCount}/16 marcadas</span>
       </div>
 
@@ -182,9 +209,13 @@ export default function LoteriaJugar() {
 
       {falseAlarm && (
         <div className="w-full max-w-sm rounded-2xl bg-red-500/15 border border-red-500/40 px-4 py-3 text-center">
-          <p className="text-red-300 font-bold">¡Falsa alarma!</p>
+          <p className="text-red-300 font-bold">
+            {falseAlarm === 'team' ? '¡Aún no!' : '¡Falsa alarma!'}
+          </p>
           <p className="text-red-300/70 text-xs mt-0.5">
-            Todavía no completas ningún patrón con cartas cantadas
+            {falseAlarm === 'team'
+              ? 'Ya completaste tu tabla, pero falta que tu equipo la complete'
+              : 'Todavía no completas ningún patrón con cartas cantadas'}
           </p>
         </div>
       )}
