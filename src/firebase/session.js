@@ -496,6 +496,20 @@ export async function getLoteriaDeck(sessionId) {
  * y limpia marcas, cantadas y ganador. Sirve tanto para la primera partida como
  * para "Nueva ronda" — en ese caso se pasa el número de ronda siguiente.
  */
+// Runs a write and, if the database refuses it, re-throws tagged with what was
+// being written. A bare "permission denied" doesn't say which node was
+// rejected, which is the difference between a fixable report and a dead end.
+async function stage(label, run) {
+  try {
+    await run()
+  } catch (e) {
+    const err = new Error(`${label} · ${e?.code || e?.message || e}`)
+    err.code = e?.code
+    err.stage = label
+    throw err
+  }
+}
+
 export async function startLoteriaRound(sessionId, deck, boards, round) {
   // This used to be one atomic multi-path update. When the database refused a
   // single path the whole round silently failed to start, and nothing said
@@ -503,17 +517,6 @@ export async function startLoteriaRound(sessionId, deck, boards, round) {
   //
   // The phase flip goes last on purpose: if any earlier write is refused the
   // room stays in the lobby rather than landing in a half-started round.
-  const stage = async (label, run) => {
-    try {
-      await run()
-    } catch (e) {
-      const err = new Error(`${label} · ${e?.code || e?.message || e}`)
-      err.code = e?.code
-      err.stage = label
-      throw err
-    }
-  }
-
   await stage('mazo', () => set(ref(db, `sessions/${sessionId}/deck`), deck))
   await stage('cantadas', () => remove(ref(db, `sessions/${sessionId}/drawn`)))
   await stage('reclamos', () => remove(ref(db, `sessions/${sessionId}/claims`)))
@@ -536,10 +539,16 @@ export async function startLoteriaRound(sessionId, deck, boards, round) {
 
 /** Canta la siguiente carta del mazo. index es cuántas se habían cantado ya. */
 export async function drawLoteriaCard(sessionId, index, cardId) {
-  await update(ref(db), {
-    [`sessions/${sessionId}/drawn/${index}`]: cardId,
-    [`sessions/${sessionId}/meta/drawnCount`]: index + 1,
-  })
+  // Writing from the root ref was refused where the same data written under
+  // its own path is accepted, so each write is scoped to the node it touches.
+  // The card lands before the counter: moderators and players both read the
+  // drawn list itself, so a refused counter can't lose a called card.
+  await stage('la carta cantada', () =>
+    set(ref(db, `sessions/${sessionId}/drawn/${index}`), cardId)
+  )
+  await stage('el contador de cantadas', () =>
+    update(ref(db, `sessions/${sessionId}/meta`), { drawnCount: index + 1 })
+  )
 }
 
 /** Marca o desmarca una casilla de la tabla del jugador. */
