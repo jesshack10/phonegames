@@ -107,11 +107,14 @@ export function subscribeVotes(sessionId, round, callback) {
 }
 
 export async function assignRolesToPlayers(sessionId, assignments) {
-  const updates = {}
+  // Written under each player's own path rather than from the root ref: the
+  // database grants writes inside a session but not at the root, so a
+  // multi-path update issued from the root is refused outright.
   for (const { playerId, role } of assignments) {
-    updates[`sessions/${sessionId}/players/${playerId}/role`] = role
+    await stage('los roles', () =>
+      set(ref(db, `sessions/${sessionId}/players/${playerId}/role`), role)
+    )
   }
-  await update(ref(db), updates)
 }
 
 export async function submitNightAction(sessionId, round, actionType, targetId) {
@@ -263,24 +266,31 @@ export async function getImpostorMeta(sessionId) {
 export async function assignImpostorRoles(sessionId, playerIds, numImpostors, word) {
   const shuffled = [...playerIds].sort(() => Math.random() - 0.5)
   const impostorSet = new Set(shuffled.slice(0, numImpostors))
-  const updates = {}
+
+  // Scoped writes, for the same reason as the rest: a multi-path update from
+  // the root ref is refused. Roles land before the phase flips, so nobody
+  // reaches the reveal screen ahead of their own role.
   for (const id of playerIds) {
-    updates[`sessions/${sessionId}/players/${id}/role`] = impostorSet.has(id) ? 'impostor' : 'crewmate'
+    await stage('los roles', () =>
+      set(ref(db, `sessions/${sessionId}/players/${id}/role`), impostorSet.has(id) ? 'impostor' : 'crewmate')
+    )
   }
-  updates[`sessions/${sessionId}/meta/word`] = word
-  updates[`sessions/${sessionId}/meta/phase`] = 'role_reveal'
-  await update(ref(db), updates)
+  await stage('la palabra y la fase', () =>
+    update(ref(db, `sessions/${sessionId}/meta`), { word, phase: 'role_reveal' })
+  )
 }
 
 export async function resetImpostorGame(sessionId, playerIds) {
-  const updates = {
-    [`sessions/${sessionId}/meta/phase`]: 'lobby',
-    [`sessions/${sessionId}/meta/word`]: null,
-  }
+  // Roles are cleared before the phase goes back to lobby, so nobody is sent
+  // to the lobby still holding the previous round's role.
   for (const id of playerIds) {
-    updates[`sessions/${sessionId}/players/${id}/role`] = null
+    await stage('los roles', () =>
+      remove(ref(db, `sessions/${sessionId}/players/${id}/role`))
+    )
   }
-  await update(ref(db), updates)
+  await stage('la fase', () =>
+    update(ref(db, `sessions/${sessionId}/meta`), { phase: 'lobby', word: null })
+  )
 }
 
 export async function updateImpostorMeta(sessionId, updates) {
