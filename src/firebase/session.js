@@ -449,8 +449,12 @@ export async function createLoteriaSession(hostId, config) {
         // Una baraja personalizada vive aquí: meta es el nodo que la base deja
         // leer, y así llega a todos los jugadores con la sala.
         customCards: config.customCards ?? null,
+        mode: config.mode ?? 'individual',
+        teamCount: config.teamCount ?? null,
+        teamAssign: config.teamAssign ?? null,
+        teamWin: config.teamWin ?? null,
         round: 1,
-        winner: null,
+        scores: null,
       }
     })
     if (!taken) break
@@ -532,7 +536,7 @@ async function stage(label, run) {
   }
 }
 
-export async function startLoteriaRound(sessionId, boards, round) {
+export async function startLoteriaRound(sessionId, boards, round, metaPatch = {}, teams = null) {
   // Everything lives under players/ and meta/, the only nodes this database
   // grants. An earlier design kept the deck and the called cards in their own
   // top-level nodes; reads of those were refused, so a called card was written
@@ -541,8 +545,10 @@ export async function startLoteriaRound(sessionId, boards, round) {
   // The phase flip goes last on purpose: if any earlier write is refused the
   // room stays in the lobby rather than landing in a half-started round.
   for (const [playerId, board] of Object.entries(boards)) {
+    const patch = { board, marks: null }
+    if (teams && teams[playerId] != null) patch.team = teams[playerId]
     await stage('tablas', () =>
-      update(ref(db, `sessions/${sessionId}/players/${playerId}`), { board, marks: null })
+      update(ref(db, `sessions/${sessionId}/players/${playerId}`), patch)
     )
   }
 
@@ -551,7 +557,9 @@ export async function startLoteriaRound(sessionId, boards, round) {
       phase: 'active',
       round,
       drawn: null,
-      winner: null,
+      winners: null,
+      wonAtDrawn: null,
+      ...metaPatch,
     })
   )
 }
@@ -572,17 +580,45 @@ export async function setLoteriaMark(sessionId, uid, index, marked) {
  * Declara ganador. Usa una transacción para que si dos jugadores cantan
  * "¡Lotería!" casi al mismo tiempo, sólo el primero se quede con la victoria.
  */
-export async function declareLoteriaWinner(sessionId, uid, name, pattern) {
-  const winnerRef = ref(db, `sessions/${sessionId}/meta/winner`)
-  const result = await runTransaction(winnerRef, (existing) => {
-    if (existing) return existing
-    return { uid, name, pattern, at: Date.now() }
+/**
+ * Registra un "¡Lotería!" válido. Un empate es completar con la misma carta:
+ * la ronda se cierra en el número de cantadas del primer reclamo, y cualquier
+ * otro reclamo válido con ese mismo número entra también. Uno que llegue
+ * después de que el moderador cantó otra carta ya es tarde.
+ *
+ * Devuelve { accepted } — false significa que llegó tarde, no que sea inválido.
+ */
+export async function claimLoteriaWin(sessionId, claim, drawnCount) {
+  const gate = ref(db, `sessions/${sessionId}/meta/wonAtDrawn`)
+  let accepted = false
+  await stage('el cierre de la ronda', async () => {
+    await runTransaction(gate, (existing) => {
+      if (existing == null) { accepted = true; return drawnCount }
+      if (existing === drawnCount) { accepted = true; return existing }
+      return existing
+    })
   })
-  const winner = result.snapshot.val()
-  if (winner?.uid === uid) {
-    await update(ref(db, `sessions/${sessionId}/meta`), { phase: 'won' })
-  }
-  return winner
+  if (!accepted) return { accepted: false }
+
+  await stage('el ganador', () =>
+    set(ref(db, `sessions/${sessionId}/meta/winners/${claim.uid}`), {
+      name: claim.name,
+      team: claim.team ?? null,
+      pattern: claim.pattern,
+      at: Date.now(),
+    })
+  )
+  await stage('la fase', () =>
+    update(ref(db, `sessions/${sessionId}/meta`), { phase: 'won' })
+  )
+  return { accepted: true }
+}
+
+/** Asigna a mano el equipo de un jugador (lo usa el moderador en el lobby). */
+export async function setPlayerTeam(sessionId, uid, team) {
+  await stage('el equipo', () =>
+    update(ref(db, `sessions/${sessionId}/players/${uid}`), { team })
+  )
 }
 
 export async function updateLoteriaMeta(sessionId, updates) {

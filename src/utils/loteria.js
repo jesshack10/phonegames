@@ -130,3 +130,46 @@ export function deckSize(deck) {
 export function findCard(deck, cardId) {
   return deck?.cards?.find(c => c.id === cardId)
 }
+
+// ─── Equipos ─────────────────────────────────────────────────────────────────
+
+export const TEAMS = [
+  { id: 0, name: 'Rojo',     emoji: '🔴', chip: 'bg-red-500/20 border-red-500/50 text-red-200' },
+  { id: 1, name: 'Azul',     emoji: '🔵', chip: 'bg-blue-500/20 border-blue-500/50 text-blue-200' },
+  { id: 2, name: 'Verde',    emoji: '🟢', chip: 'bg-green-500/20 border-green-500/50 text-green-200' },
+  { id: 3, name: 'Amarillo', emoji: '🟡', chip: 'bg-yellow-500/20 border-yellow-500/50 text-yellow-200' },
+]
+
+export const MIN_TEAMS = 2
+export const MAX_TEAMS = TEAMS.length
+
+export function teamInfo(teamId) {
+  return TEAMS[teamId] ?? null
+}
+
+/** Reparte a los jugadores en equipos parejos, barajando primero. */
+export function assignTeamsRandomly(playerIds, teamCount) {
+  const n = Math.min(Math.max(teamCount || MIN_TEAMS, MIN_TEAMS), MAX_TEAMS)
+  const shuffled = shuffle(playerIds)
+  const teams = {}
+  shuffled.forEach((id, i) => { teams[id] = i % n })
+  return teams
+}
+
+/**
+ * ¿Ganó el equipo? Con 'first' basta quien cantó; con 'all' todos los del
+ * equipo tienen que tener el patrón completo y marcado.
+ *
+ * players — la lista completa de la sala, con board y marks
+ */
+export function checkTeamWin(players, teamId, drawnIds, patternKeys, rule) {
+  const members = (players || []).filter(p => p.team === teamId && Array.isArray(p.board))
+  if (!members.length) return false
+  if (rule !== 'all') return true
+  return members.every(p => checkWin(p.board, p.marks, drawnIds, patternKeys))
+}
+
+/** Con quién comparte marcador: su equipo, o él mismo si se juega individual. */
+export function scoreKeyFor(mode, uid, teamId) {
+  return mode === 'teams' && teamId != null ? `t${teamId}` : uid
+}
