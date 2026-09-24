@@ -10,7 +10,7 @@ import {
 import { useAuth } from '../../hooks/useAuth.js'
 import { LoteriaBoard } from '../../components/loteria/LoteriaBoard.jsx'
 import { checkWin, normalizeDrawn, checkTeamWin, teamInfo, PATTERNS } from '../../utils/loteria.js'
-import { resolveDeck } from '../../data/decks/index.js'
+import { resolveDeck, knowsDeck } from '../../data/decks/index.js'
 
 function buzz(ms) {
   try { navigator.vibrate?.(ms) } catch {}
@@ -42,6 +42,7 @@ export default function LoteriaJugar() {
   // Llega dentro de meta; la pantalla nunca la muestra, sólo valida con ella.
   const drawn = normalizeDrawn(meta?.drawn)
   const deck = resolveDeck(meta)
+  const staleClient = !knowsDeck(meta)
   const me = players.find(p => p.id === uid)
   const board = me?.board
   const round = meta?.round ?? 1
@@ -202,6 +203,15 @@ export default function LoteriaJugar() {
           </span>
         ))}
       </div>
+
+      {staleClient && (
+        <div className="w-full max-w-sm rounded-2xl bg-amber-500/15 border border-amber-500/50 px-4 py-3 text-center">
+          <p className="text-amber-200 font-bold text-sm">Tienes una versión vieja</p>
+          <p className="text-amber-200/70 text-xs mt-0.5">
+            Cierra la pestaña y vuelve a abrir el sitio: las cartas que ves no son las de esta sala.
+          </p>
+        </div>
+      )}
 
       <div className="w-full max-w-sm">
         <LoteriaBoard board={board} deck={deck} marks={marks} onToggle={handleToggle} />

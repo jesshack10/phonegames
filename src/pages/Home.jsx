@@ -41,6 +41,14 @@ export default function Home() {
       >
         🍅 Pomodoro
       </button>
+
+      {/* Para comprobar que todos los teléfonos traen la misma versión. El
+          guard evita que un sello ausente tumbe la pantalla entera: es
+          informativo, no vale una pantalla en blanco. */}
+      <p className="text-white/20 text-[11px] font-mono mt-4">
+        v{typeof __BUILD_ID__ === 'undefined' ? 'dev' : __BUILD_ID__}
+        {typeof __BUILD_AT__ !== 'undefined' && ` · ${__BUILD_AT__}`}
+      </p>
     </div>
   )
 }
