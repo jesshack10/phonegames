@@ -36,13 +36,15 @@ export default function LoteriaModerador() {
   const [deck, setDeck] = useState([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [readError, setReadError] = useState('')
   const [showHistory, setShowHistory] = useState(false)
   const sessionExistedRef = useRef(false)
 
   useEffect(() => {
-    const u1 = subscribeLoteriaSession(sessionId, setMeta)
-    const u2 = subscribeLoteriaPlayers(sessionId, setPlayers)
-    const u3 = subscribeLoteriaDrawn(sessionId, setDrawn)
+    const onRead = (what) => setReadError(`No se puede leer ${what}`)
+    const u1 = subscribeLoteriaSession(sessionId, setMeta, onRead)
+    const u2 = subscribeLoteriaPlayers(sessionId, setPlayers, onRead)
+    const u3 = subscribeLoteriaDrawn(sessionId, setDrawn, onRead)
     return () => { u1(); u2(); u3() }
   }, [sessionId])
 
@@ -206,9 +208,9 @@ export default function LoteriaModerador() {
           <p className="text-white/40 text-sm text-center">Se necesita al menos 1 jugador para empezar</p>
         )}
 
-        {error && (
+        {(error || readError) && (
           <p className="w-full max-w-sm text-red-300 bg-red-500/10 border border-red-500/40 rounded-2xl px-4 py-3 text-sm text-center break-words">
-            {error}
+            {error || readError}
           </p>
         )}
 
@@ -287,9 +289,9 @@ export default function LoteriaModerador() {
               : 'Toca para cantar la primera carta'}
           </p>
 
-          {error && (
+          {(error || readError) && (
             <p className="w-full max-w-sm text-red-300 bg-red-500/10 border border-red-500/40 rounded-2xl px-4 py-3 text-sm text-center break-words">
-              {error}
+              {error || readError}
             </p>
           )}
 
