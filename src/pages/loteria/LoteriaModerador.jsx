@@ -4,8 +4,6 @@ import { QRCodeSVG } from 'qrcode.react'
 import {
   subscribeLoteriaSession,
   subscribeLoteriaPlayers,
-  subscribeLoteriaDrawn,
-  getLoteriaDeck,
   startLoteriaRound,
   drawLoteriaCard,
   updateLoteriaMeta,
@@ -15,7 +13,7 @@ import {
 import { useAuth } from '../../hooks/useAuth.js'
 import ShareSessionLink from '../../components/ShareSessionLink.jsx'
 import { LoteriaCard, LoteriaCardPlaceholder } from '../../components/loteria/LoteriaCard.jsx'
-import { buildDeck, dealBoards, PATTERNS, PATTERN_KEYS, TOTAL_CARDS } from '../../utils/loteria.js'
+import { pickNextCard, normalizeDrawn, dealBoards, PATTERNS, PATTERN_KEYS, TOTAL_CARDS } from '../../utils/loteria.js'
 
 // Firebase puts the useful part in `code` (PERMISSION_DENIED and friends);
 // without it a rejected write reads as nothing happening at all. Dealing a
@@ -32,8 +30,6 @@ export default function LoteriaModerador() {
   const { uid } = useAuth()
   const [meta, setMeta] = useState(null)
   const [players, setPlayers] = useState([])
-  const [drawn, setDrawn] = useState([])
-  const [deck, setDeck] = useState([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [readError, setReadError] = useState('')
@@ -44,8 +40,7 @@ export default function LoteriaModerador() {
     const onRead = (what) => setReadError(`No se puede leer ${what}`)
     const u1 = subscribeLoteriaSession(sessionId, setMeta, onRead)
     const u2 = subscribeLoteriaPlayers(sessionId, setPlayers, onRead)
-    const u3 = subscribeLoteriaDrawn(sessionId, setDrawn, onRead)
-    return () => { u1(); u2(); u3() }
+    return () => { u1(); u2() }
   }, [sessionId])
 
   // La sala murió (expiró o alguien la cerró) → de vuelta al inicio
@@ -60,12 +55,9 @@ export default function LoteriaModerador() {
     }
   }, [meta, navigate, sessionId])
 
-  // Recupera el mazo de Firebase al recargar a media partida
-  useEffect(() => {
-    if (!meta || meta.phase === 'lobby' || deck.length) return
-    getLoteriaDeck(sessionId).then(d => { if (d.length) setDeck(d) })
-  }, [meta, sessionId, deck.length])
-
+  // Las cantadas viajan dentro de meta, así que llegan con la misma
+  // suscripción que la sala: nada que recuperar aparte al recargar.
+  const drawn = normalizeDrawn(meta?.drawn)
   const patterns = meta?.patterns ?? ['full']
   const guests = players.filter(p => !p.isHost)
   const canStart = guests.length >= 1
@@ -87,10 +79,8 @@ export default function LoteriaModerador() {
     setBusy(true)
     setError('')
     try {
-      const newDeck = buildDeck()
       const boards = dealBoards(guests.map(p => p.id))
-      await startLoteriaRound(sessionId, newDeck, boards, round)
-      setDeck(newDeck)
+      await startLoteriaRound(sessionId, boards, round)
     } catch (e) {
       // This write is atomic: one rejected path and the round never starts, so
       // swallowing it left the moderator tapping a button that did nothing.
@@ -106,19 +96,8 @@ export default function LoteriaModerador() {
     setBusy(true)
     setError('')
     try {
-      // The deck lives in Firebase so the moderator can reload mid-round. If
-      // this device doesn't have it yet, fetch it rather than no-op: tapping a
-      // dead button with no explanation is the worst outcome.
-      let current = deck
-      if (!current.length) {
-        current = await getLoteriaDeck(sessionId)
-        if (current.length) setDeck(current)
-      }
-      const next = current[drawnCount]
-      if (next == null) {
-        setError('No se pudo leer el mazo de esta ronda. Toca "Nueva ronda" para repartir otra vez.')
-        return
-      }
+      const next = pickNextCard(drawn)
+      if (next == null) return
       await drawLoteriaCard(sessionId, drawnCount, next)
     } catch (e) {
       console.error('cantar carta falló:', e)

@@ -424,10 +424,12 @@ export function subscribePeticionAssignment(sessionId, uid, cb, onError) {
 
 // ─── LOTERÍA ──────────────────────────────────────────────────────────────────
 // Estructura en Firebase:
-//   meta    { game:'loteria', phase, patterns[], round, drawnCount, winner }
-//   deck    [54 ids barajados]  — sólo lo lee el moderador
-//   drawn   { 0: id, 1: id… }   — cartas ya cantadas, en orden
+//   meta    { game:'loteria', phase, patterns[], round, winner,
+//             drawn: { 0: id, 1: id… } }  — cartas cantadas, en orden
 //   players { uid: { name, isHost, board[16], marks{} } }
+//
+// Todo cuelga de meta y players a propósito: son los únicos nodos que esta
+// base concede. Un nodo propio para el mazo o las cantadas se rechazaba.
 
 export async function createLoteriaSession(hostId, config) {
   let sessionId, attempts = 0
@@ -444,7 +446,6 @@ export async function createLoteriaSession(hostId, config) {
         phase: 'lobby',
         patterns: config.patterns,
         round: 1,
-        drawnCount: 0,
         winner: null,
       }
     })
@@ -488,31 +489,12 @@ export function subscribeLoteriaPlayers(sessionId, cb, onError) {
   return () => off(r)
 }
 
-// Cartas ya cantadas, en orden de salida. Los jugadores la usan sólo para
-// validar su "¡Lotería!"; su pantalla nunca la muestra.
-export function subscribeLoteriaDrawn(sessionId, cb, onError) {
-  const r = ref(db, `sessions/${sessionId}/drawn`)
-  onValue(r, snap => {
-    const val = snap.val()
-    cb(Array.isArray(val) ? val.filter(v => v != null) : Object.values(val || {}))
-  }, e => {
-    // Without this the card is written and the screen never changes: the
-    // moderator taps a working button and sees absolutely nothing.
-    console.error('leer las cantadas falló:', e)
-    onError?.(`las cartas cantadas · ${e?.code || e?.message || e}`)
-  })
-  return () => off(r)
-}
-
+// Las cantadas viven dentro de meta. Firebase hereda el permiso de lectura
+// hacia abajo, así que todo lo que cuelga de meta se lee con el mismo permiso
+// que la sala — a diferencia de un nodo propio, que las reglas rechazaban.
 export async function getLoteriaMeta(sessionId) {
   const snap = await get(ref(db, `sessions/${sessionId}/meta`))
   return snap.val()
-}
-
-/** El mazo barajado de la ronda en curso (lo recupera el moderador al recargar). */
-export async function getLoteriaDeck(sessionId) {
-  const snap = await stageRead('el mazo', () => get(ref(db, `sessions/${sessionId}/deck`)))
-  return snap.val() || []
 }
 
 /**
@@ -546,17 +528,14 @@ async function stage(label, run) {
   }
 }
 
-export async function startLoteriaRound(sessionId, deck, boards, round) {
-  // This used to be one atomic multi-path update. When the database refused a
-  // single path the whole round silently failed to start, and nothing said
-  // which path it was. Writing in stages names the one that fails.
+export async function startLoteriaRound(sessionId, boards, round) {
+  // Everything lives under players/ and meta/, the only nodes this database
+  // grants. An earlier design kept the deck and the called cards in their own
+  // top-level nodes; reads of those were refused, so a called card was written
+  // and never came back.
   //
   // The phase flip goes last on purpose: if any earlier write is refused the
   // room stays in the lobby rather than landing in a half-started round.
-  await stage('mazo', () => set(ref(db, `sessions/${sessionId}/deck`), deck))
-  await stage('cantadas', () => remove(ref(db, `sessions/${sessionId}/drawn`)))
-  await stage('reclamos', () => remove(ref(db, `sessions/${sessionId}/claims`)))
-
   for (const [playerId, board] of Object.entries(boards)) {
     await stage('tablas', () =>
       update(ref(db, `sessions/${sessionId}/players/${playerId}`), { board, marks: null })
@@ -567,23 +546,16 @@ export async function startLoteriaRound(sessionId, deck, boards, round) {
     update(ref(db, `sessions/${sessionId}/meta`), {
       phase: 'active',
       round,
-      drawnCount: 0,
+      drawn: null,
       winner: null,
     })
   )
 }
 
-/** Canta la siguiente carta del mazo. index es cuántas se habían cantado ya. */
+/** Canta una carta. index es cuántas se habían cantado ya. */
 export async function drawLoteriaCard(sessionId, index, cardId) {
-  // Writing from the root ref was refused where the same data written under
-  // its own path is accepted, so each write is scoped to the node it touches.
-  // The card lands before the counter: moderators and players both read the
-  // drawn list itself, so a refused counter can't lose a called card.
   await stage('la carta cantada', () =>
-    set(ref(db, `sessions/${sessionId}/drawn/${index}`), cardId)
-  )
-  await stage('el contador de cantadas', () =>
-    update(ref(db, `sessions/${sessionId}/meta`), { drawnCount: index + 1 })
+    set(ref(db, `sessions/${sessionId}/meta/drawn/${index}`), cardId)
   )
 }
 
