@@ -1,4 +1,4 @@
-import { LOTERIA_CARDS, TOTAL_CARDS } from '../data/loteria.js'
+import { getDeck } from '../data/decks/index.js'
 
 export const BOARD_COLS = 4
 export const BOARD_ROWS = 4
@@ -59,9 +59,9 @@ export function shuffle(arr) {
  * device to read ahead — the next card doesn't exist until it's called.
  * Returns null once all 54 are out.
  */
-export function pickNextCard(drawnIds) {
+export function pickNextCard(deckId, drawnIds) {
   const drawn = drawnIds instanceof Set ? drawnIds : new Set(drawnIds || [])
-  const remaining = LOTERIA_CARDS.map(c => c.id).filter(id => !drawn.has(id))
+  const remaining = getDeck(deckId).cards.map(c => c.id).filter(id => !drawn.has(id))
   if (!remaining.length) return null
   return remaining[Math.floor(Math.random() * remaining.length)]
 }
@@ -81,15 +81,15 @@ export function normalizeDrawn(value) {
   return []
 }
 
-/** A random 4x4 board: 16 distinct card ids out of the 54. */
-export function generateBoard() {
-  return shuffle(LOTERIA_CARDS.map(c => c.id)).slice(0, BOARD_SIZE)
+/** A random 4x4 board: 16 distinct card ids from the room's deck. */
+export function generateBoard(deckId) {
+  return shuffle(getDeck(deckId).cards.map(c => c.id)).slice(0, BOARD_SIZE)
 }
 
 /** One distinct random board per player id, as a { [playerId]: number[] } map. */
-export function dealBoards(playerIds) {
+export function dealBoards(deckId, playerIds) {
   const boards = {}
-  for (const id of playerIds) boards[id] = generateBoard()
+  for (const id of playerIds) boards[id] = generateBoard(deckId)
   return boards
 }
 
@@ -122,4 +122,7 @@ export function checkWin(board, marks, drawnIds, patternKeys) {
   return null
 }
 
-export { TOTAL_CARDS }
+/** Cuántas cartas trae la baraja de esta sala. */
+export function deckSize(deckId) {
+  return getDeck(deckId).cards.length
+}

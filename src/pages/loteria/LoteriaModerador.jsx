@@ -13,7 +13,8 @@ import {
 import { useAuth } from '../../hooks/useAuth.js'
 import ShareSessionLink from '../../components/ShareSessionLink.jsx'
 import { LoteriaCard, LoteriaCardPlaceholder } from '../../components/loteria/LoteriaCard.jsx'
-import { pickNextCard, normalizeDrawn, dealBoards, PATTERNS, PATTERN_KEYS, TOTAL_CARDS } from '../../utils/loteria.js'
+import { pickNextCard, normalizeDrawn, dealBoards, deckSize, PATTERNS, PATTERN_KEYS } from '../../utils/loteria.js'
+import { getDeck, getDeckCard } from '../../data/decks/index.js'
 
 // Firebase puts the useful part in `code` (PERMISSION_DENIED and friends);
 // without it a rejected write reads as nothing happening at all. Dealing a
@@ -58,12 +59,15 @@ export default function LoteriaModerador() {
   // Las cantadas viajan dentro de meta, así que llegan con la misma
   // suscripción que la sala: nada que recuperar aparte al recargar.
   const drawn = normalizeDrawn(meta?.drawn)
+  const deckId = meta?.deck
+  const deck = getDeck(deckId)
+  const totalCards = deckSize(deckId)
   const patterns = meta?.patterns ?? ['full']
   const guests = players.filter(p => !p.isHost)
   const canStart = guests.length >= 1
   const drawnCount = drawn.length
   const currentId = drawnCount ? drawn[drawnCount - 1] : null
-  const deckEmpty = drawnCount >= TOTAL_CARDS
+  const deckEmpty = drawnCount >= totalCards
   const winner = meta?.winner
   const lobbyUrl = `${window.location.origin}${window.location.pathname}#/loteria/sala/${sessionId}`
 
@@ -79,7 +83,7 @@ export default function LoteriaModerador() {
     setBusy(true)
     setError('')
     try {
-      const boards = dealBoards(guests.map(p => p.id))
+      const boards = dealBoards(deckId, guests.map(p => p.id))
       await startLoteriaRound(sessionId, boards, round)
     } catch (e) {
       // This write is atomic: one rejected path and the round never starts, so
@@ -96,7 +100,7 @@ export default function LoteriaModerador() {
     setBusy(true)
     setError('')
     try {
-      const next = pickNextCard(drawn)
+      const next = pickNextCard(deckId, drawn)
       if (next == null) return
       await drawLoteriaCard(sessionId, drawnCount, next)
     } catch (e) {
@@ -161,6 +165,14 @@ export default function LoteriaModerador() {
               </div>
             ))}
           </div>
+        </div>
+
+        <div className="w-full max-w-xs bg-white/5 rounded-2xl px-5 py-4 border border-white/10">
+          <p className="text-white font-semibold mb-1">Baraja</p>
+          <p className="text-white/60 text-sm">{deck.emoji} {deck.name} · {totalCards} cartas</p>
+          {deck.hasPrompts && (
+            <p className="text-white/40 text-xs mt-1">Al cantar cada carta te aparecerá una pregunta para leer en voz alta.</p>
+          )}
         </div>
 
         <div className="w-full max-w-xs bg-white/5 rounded-2xl px-5 py-4 border border-white/10">
@@ -258,13 +270,22 @@ export default function LoteriaModerador() {
         <>
           <div className="w-full max-w-[240px] mt-2">
             {currentId
-              ? <LoteriaCard id={currentId} size="xl" />
+              ? <LoteriaCard id={currentId} deckId={deckId} size="xl" />
               : <LoteriaCardPlaceholder />}
           </div>
 
+          {deck.hasPrompts && currentId && (
+            <div className="w-full max-w-sm rounded-2xl bg-amber-500/10 border border-amber-500/40 px-4 py-3">
+              <p className="text-amber-300/60 text-[11px] uppercase tracking-widest mb-1 text-center">Lee esto en voz alta</p>
+              <p className="text-white text-base text-center leading-snug">
+                {getDeckCard(deckId, currentId)?.prompt}
+              </p>
+            </div>
+          )}
+
           <p className="text-white/40 text-sm">
             {currentId
-              ? `${drawnCount} de ${TOTAL_CARDS} cantadas`
+              ? `${drawnCount} de ${totalCards} cantadas`
               : 'Toca para cantar la primera carta'}
           </p>
 
@@ -306,7 +327,7 @@ export default function LoteriaModerador() {
           {showHistory && (
             <div className="grid grid-cols-6 gap-1.5 mt-1">
               {[...drawn].reverse().map((id, i) => (
-                <LoteriaCard key={`${id}-${i}`} id={id} size="sm" dimmed={i > 0} />
+                <LoteriaCard key={`${id}-${i}`} id={id} deckId={deckId} size="sm" dimmed={i > 0} />
               ))}
             </div>
           )}
