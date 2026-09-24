@@ -1,4 +1,3 @@
-import { getDeck } from '../data/decks/index.js'
 
 export const BOARD_COLS = 4
 export const BOARD_ROWS = 4
@@ -59,9 +58,9 @@ export function shuffle(arr) {
  * device to read ahead — the next card doesn't exist until it's called.
  * Returns null once all 54 are out.
  */
-export function pickNextCard(deckId, drawnIds) {
+export function pickNextCard(deck, drawnIds) {
   const drawn = drawnIds instanceof Set ? drawnIds : new Set(drawnIds || [])
-  const remaining = getDeck(deckId).cards.map(c => c.id).filter(id => !drawn.has(id))
+  const remaining = (deck?.cards ?? []).map(c => c.id).filter(id => !drawn.has(id))
   if (!remaining.length) return null
   return remaining[Math.floor(Math.random() * remaining.length)]
 }
@@ -82,14 +81,14 @@ export function normalizeDrawn(value) {
 }
 
 /** A random 4x4 board: 16 distinct card ids from the room's deck. */
-export function generateBoard(deckId) {
-  return shuffle(getDeck(deckId).cards.map(c => c.id)).slice(0, BOARD_SIZE)
+export function generateBoard(deck) {
+  return shuffle((deck?.cards ?? []).map(c => c.id)).slice(0, BOARD_SIZE)
 }
 
 /** One distinct random board per player id, as a { [playerId]: number[] } map. */
-export function dealBoards(deckId, playerIds) {
+export function dealBoards(deck, playerIds) {
   const boards = {}
-  for (const id of playerIds) boards[id] = generateBoard(deckId)
+  for (const id of playerIds) boards[id] = generateBoard(deck)
   return boards
 }
 
@@ -123,6 +122,11 @@ export function checkWin(board, marks, drawnIds, patternKeys) {
 }
 
 /** Cuántas cartas trae la baraja de esta sala. */
-export function deckSize(deckId) {
-  return getDeck(deckId).cards.length
+export function deckSize(deck) {
+  return deck?.cards?.length ?? 0
+}
+
+/** La carta con ese id dentro de la baraja dada. */
+export function findCard(deck, cardId) {
+  return deck?.cards?.find(c => c.id === cardId)
 }

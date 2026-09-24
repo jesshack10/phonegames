@@ -13,8 +13,8 @@ import {
 import { useAuth } from '../../hooks/useAuth.js'
 import ShareSessionLink from '../../components/ShareSessionLink.jsx'
 import { LoteriaCard, LoteriaCardPlaceholder } from '../../components/loteria/LoteriaCard.jsx'
-import { pickNextCard, normalizeDrawn, dealBoards, deckSize, PATTERNS, PATTERN_KEYS } from '../../utils/loteria.js'
-import { getDeck, getDeckCard } from '../../data/decks/index.js'
+import { pickNextCard, normalizeDrawn, dealBoards, deckSize, findCard, PATTERNS, PATTERN_KEYS } from '../../utils/loteria.js'
+import { resolveDeck } from '../../data/decks/index.js'
 
 // Firebase puts the useful part in `code` (PERMISSION_DENIED and friends);
 // without it a rejected write reads as nothing happening at all. Dealing a
@@ -59,9 +59,8 @@ export default function LoteriaModerador() {
   // Las cantadas viajan dentro de meta, así que llegan con la misma
   // suscripción que la sala: nada que recuperar aparte al recargar.
   const drawn = normalizeDrawn(meta?.drawn)
-  const deckId = meta?.deck
-  const deck = getDeck(deckId)
-  const totalCards = deckSize(deckId)
+  const deck = resolveDeck(meta)
+  const totalCards = deckSize(deck)
   const patterns = meta?.patterns ?? ['full']
   const guests = players.filter(p => !p.isHost)
   const canStart = guests.length >= 1
@@ -83,7 +82,7 @@ export default function LoteriaModerador() {
     setBusy(true)
     setError('')
     try {
-      const boards = dealBoards(deckId, guests.map(p => p.id))
+      const boards = dealBoards(deck, guests.map(p => p.id))
       await startLoteriaRound(sessionId, boards, round)
     } catch (e) {
       // This write is atomic: one rejected path and the round never starts, so
@@ -100,7 +99,7 @@ export default function LoteriaModerador() {
     setBusy(true)
     setError('')
     try {
-      const next = pickNextCard(deckId, drawn)
+      const next = pickNextCard(deck, drawn)
       if (next == null) return
       await drawLoteriaCard(sessionId, drawnCount, next)
     } catch (e) {
@@ -270,7 +269,7 @@ export default function LoteriaModerador() {
         <>
           <div className="w-full max-w-[240px] mt-2">
             {currentId
-              ? <LoteriaCard id={currentId} deckId={deckId} size="xl" />
+              ? <LoteriaCard id={currentId} deck={deck} size="xl" />
               : <LoteriaCardPlaceholder />}
           </div>
 
@@ -278,7 +277,7 @@ export default function LoteriaModerador() {
             <div className="w-full max-w-sm rounded-2xl bg-amber-500/10 border border-amber-500/40 px-4 py-3">
               <p className="text-amber-300/60 text-[11px] uppercase tracking-widest mb-1 text-center">Lee esto en voz alta</p>
               <p className="text-white text-base text-center leading-snug">
-                {getDeckCard(deckId, currentId)?.prompt}
+                {findCard(deck, currentId)?.prompt}
               </p>
             </div>
           )}
@@ -327,7 +326,7 @@ export default function LoteriaModerador() {
           {showHistory && (
             <div className="grid grid-cols-6 gap-1.5 mt-1">
               {[...drawn].reverse().map((id, i) => (
-                <LoteriaCard key={`${id}-${i}`} id={id} deckId={deckId} size="sm" dimmed={i > 0} />
+                <LoteriaCard key={`${id}-${i}`} id={id} deck={deck} size="sm" dimmed={i > 0} />
               ))}
             </div>
           )}
