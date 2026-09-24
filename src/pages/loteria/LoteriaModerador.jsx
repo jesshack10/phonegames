@@ -17,6 +17,12 @@ import ShareSessionLink from '../../components/ShareSessionLink.jsx'
 import { LoteriaCard, LoteriaCardPlaceholder } from '../../components/loteria/LoteriaCard.jsx'
 import { buildDeck, dealBoards, PATTERNS, PATTERN_KEYS, TOTAL_CARDS } from '../../utils/loteria.js'
 
+// Firebase puts the useful part in `code` (PERMISSION_DENIED and friends);
+// without it a rejected write reads as nothing happening at all.
+function describe(e) {
+  return e?.code || e?.message || 'error desconocido'
+}
+
 export default function LoteriaModerador() {
   const { sessionId } = useParams()
   const navigate = useNavigate()
@@ -26,6 +32,7 @@ export default function LoteriaModerador() {
   const [drawn, setDrawn] = useState([])
   const [deck, setDeck] = useState([])
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
   const [showHistory, setShowHistory] = useState(false)
   const sessionExistedRef = useRef(false)
 
@@ -73,11 +80,17 @@ export default function LoteriaModerador() {
   async function handleStart(round) {
     if (busy) return
     setBusy(true)
+    setError('')
     try {
       const newDeck = buildDeck()
       const boards = dealBoards(guests.map(p => p.id))
       await startLoteriaRound(sessionId, newDeck, boards, round)
       setDeck(newDeck)
+    } catch (e) {
+      // This write is atomic: one rejected path and the round never starts, so
+      // swallowing it left the moderator tapping a button that did nothing.
+      console.error('repartir falló:', e)
+      setError(`No se pudo repartir: ${describe(e)}`)
     } finally {
       setBusy(false)
     }
@@ -85,11 +98,26 @@ export default function LoteriaModerador() {
 
   async function handleDraw() {
     if (busy || deckEmpty || winner) return
-    const next = deck[drawnCount]
-    if (next == null) return
     setBusy(true)
+    setError('')
     try {
+      // The deck lives in Firebase so the moderator can reload mid-round. If
+      // this device doesn't have it yet, fetch it rather than no-op: tapping a
+      // dead button with no explanation is the worst outcome.
+      let current = deck
+      if (!current.length) {
+        current = await getLoteriaDeck(sessionId)
+        if (current.length) setDeck(current)
+      }
+      const next = current[drawnCount]
+      if (next == null) {
+        setError('No se pudo leer el mazo de esta ronda. Toca "Nueva ronda" para repartir otra vez.')
+        return
+      }
       await drawLoteriaCard(sessionId, drawnCount, next)
+    } catch (e) {
+      console.error('cantar carta falló:', e)
+      setError(`No se pudo cantar la carta: ${describe(e)}`)
     } finally {
       setBusy(false)
     }
@@ -175,6 +203,12 @@ export default function LoteriaModerador() {
           <p className="text-white/40 text-sm text-center">Se necesita al menos 1 jugador para empezar</p>
         )}
 
+        {error && (
+          <p className="w-full max-w-sm text-red-300 bg-red-500/10 border border-red-500/40 rounded-2xl px-4 py-3 text-sm text-center break-words">
+            {error}
+          </p>
+        )}
+
         <button
           onClick={() => handleStart(meta.round ?? 1)}
           disabled={!canStart || busy}
@@ -216,6 +250,12 @@ export default function LoteriaModerador() {
           <p className="text-amber-300 font-semibold">{PATTERNS[winner.pattern]?.label ?? winner.pattern}</p>
           <p className="text-white/40 text-sm">{drawnCount} cartas cantadas</p>
 
+          {error && (
+            <p className="w-full text-red-300 bg-red-500/10 border border-red-500/40 rounded-2xl px-4 py-3 text-sm text-center break-words">
+              {error}
+            </p>
+          )}
+
           <button
             onClick={() => handleStart((meta.round ?? 1) + 1)}
             disabled={busy}
@@ -243,6 +283,12 @@ export default function LoteriaModerador() {
               ? `${drawnCount} de ${TOTAL_CARDS} cantadas`
               : 'Toca para cantar la primera carta'}
           </p>
+
+          {error && (
+            <p className="w-full max-w-sm text-red-300 bg-red-500/10 border border-red-500/40 rounded-2xl px-4 py-3 text-sm text-center break-words">
+              {error}
+            </p>
+          )}
 
           <button
             onClick={handleDraw}
