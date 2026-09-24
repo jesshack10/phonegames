@@ -15,6 +15,11 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # The Firebase secrets live on the github-pages environment, and Vite bakes
+    # them into the bundle here at build time — not during deploy. Without this
+    # the build reads them as empty and publishes a site that cannot reach
+    # Firebase at all.
+    environment: github-pages
     steps:
       - uses: actions/checkout@v4
 
