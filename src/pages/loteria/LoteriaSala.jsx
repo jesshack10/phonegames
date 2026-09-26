@@ -5,11 +5,12 @@ import {
   subscribeLoteriaSession,
   subscribeLoteriaPlayers,
   getLoteriaMeta,
+  setLoteriaPair,
   deleteSession,
   SESSION_TTL,
 } from '../../firebase/session.js'
 import { useAuth } from '../../hooks/useAuth.js'
-import { PATTERNS } from '../../utils/loteria.js'
+import { PATTERNS, couplesFrom } from '../../utils/loteria.js'
 
 export default function LoteriaSala() {
   const { sessionId } = useParams()
@@ -115,6 +116,79 @@ export default function LoteriaSala() {
   const guests = players.filter(p => !p.isHost)
   const patterns = meta?.patterns ?? []
 
+  // Modo matrimonios: cada quien escoge a su pareja y queda confirmado cuando
+  // el otro también lo escoge. Va aquí, en la sala de espera, porque es el
+  // único momento en que la gente está viendo el teléfono sin prisa.
+  const isPairs = meta?.mode === 'parejas'
+  const me = players.find(p => p.id === uid)
+  const myCouple = isPairs ? couplesFrom(players).find(c => c.a === uid || c.b === uid) : null
+  const myPick = guests.find(p => p.id === me?.pair)
+  const pickedMe = guests.filter(p => p.pair === uid && p.id !== me?.pair)
+  const takenIds = new Set(couplesFrom(players).flatMap(c => [c.a, c.b]))
+
+  function PairPicker() {
+    const otros = guests.filter(p => p.id !== uid)
+    if (myCouple) {
+      const partner = myCouple.members.find(m => m.id !== uid)
+      return (
+        <div className="w-full max-w-xs bg-green-500/10 border border-green-500/40 rounded-2xl px-5 py-4 text-center">
+          <p className="text-green-300 font-bold">💍 Hacen pareja con {partner?.name}</p>
+          <p className="text-green-300/60 text-xs mt-1">Van a compartir la misma tabla</p>
+          <button
+            onClick={() => setLoteriaPair(sessionId, uid, null).catch(() => {})}
+            className="text-white/30 text-xs mt-3 underline"
+          >
+            Cambiar
+          </button>
+        </div>
+      )
+    }
+    return (
+      <div className="w-full max-w-xs bg-white/5 rounded-2xl px-5 py-4 border border-white/10">
+        <p className="text-white font-semibold mb-1">¿Quién es tu pareja?</p>
+        <p className="text-white/40 text-xs mb-3">
+          Queda hecho cuando los dos se escogen.
+          {myPick && ` Esperando a que ${myPick.name} te escoja…`}
+        </p>
+        {pickedMe.length > 0 && (
+          <p className="text-amber-300 text-xs mb-3">
+            {pickedMe.map(p => p.name).join(', ')} te escogió. Escógelo de vuelta para confirmar.
+          </p>
+        )}
+        {otros.length === 0 ? (
+          <p className="text-white/30 text-sm">Esperando a que llegue alguien más…</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {otros.map(p => {
+              const ocupado = takenIds.has(p.id)
+              const esMiPick = me?.pair === p.id
+              const meEscogio = p.pair === uid
+              return (
+                <button
+                  key={p.id}
+                  disabled={ocupado}
+                  onClick={() => setLoteriaPair(sessionId, uid, esMiPick ? null : p.id).catch(() => {})}
+                  className={`flex items-center gap-2 rounded-xl px-4 py-3 text-left transition-colors ${
+                    esMiPick
+                      ? 'bg-amber-500 text-white'
+                      : ocupado
+                        ? 'bg-white/5 text-white/25'
+                        : 'bg-white/10 text-white active:bg-white/20'
+                  }`}
+                >
+                  <span className="font-semibold flex-1 truncate">{p.name}</span>
+                  {ocupado && <span className="text-xs">ya tiene pareja</span>}
+                  {!ocupado && meEscogio && !esMiPick && <span className="text-xs text-amber-300">te escogió</span>}
+                  {esMiPick && <span className="text-xs">esperando…</span>}
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-[#0a0a18] flex flex-col items-center px-6 py-10 gap-5">
       <div className="text-5xl mt-10">🃏</div>
@@ -133,6 +207,8 @@ export default function LoteriaSala() {
       <p className="text-white/40 text-sm">
         {guests.length} jugador{guests.length !== 1 ? 'es' : ''} en la sala
       </p>
+
+      {isPairs && <PairPicker />}
 
       <div className="w-full max-w-xs flex flex-col gap-2">
         {guests.map(p => (

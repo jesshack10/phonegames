@@ -46,12 +46,25 @@ export const DECKS = {
     id: 'matrimonios',
     name: 'Matrimonios',
     emoji: '💍',
-    tagline: 'Cada carta abre una conversación',
+    tagline: 'Adivina a tu pareja: se marca si le atinas',
     cards: MATRIMONIOS,
     // El moderador lee una pregunta al cantar; la partida es la excusa.
     hasPrompts: true,
+    // Se juega en parejas con tabla compartida, no uno contra uno. La casilla
+    // no se marca a mano: se gana adivinando lo que escribió el otro.
+    pairs: true,
+    hasNivel: true,
   },
 }
+
+// Qué tan hondo entra el mazo. 'ligero' deja fuera las cartas duras; 'profundo'
+// las incluye además de las ligeras, no en lugar de ellas — un mazo puro de
+// preguntas difíciles se siente interrogatorio, no juego.
+export const NIVELES = {
+  ligero:   { id: 'ligero',   label: 'Ligero',   emoji: '🙂', hint: 'Recuerdos, risas y antojos' },
+  profundo: { id: 'profundo', label: 'Profundo', emoji: '🫀', hint: 'Todo, incluidas las difíciles' },
+}
+export const DEFAULT_NIVEL = 'ligero'
 
 export const DECK_IDS = Object.keys(DECKS)
 export const DEFAULT_DECK = 'mexicana'
@@ -81,7 +94,18 @@ export function resolveDeck(meta) {
       cards: meta.customCards,
     }
   }
-  return getDeck(meta?.deck)
+  const base = getDeck(meta?.deck)
+  // El nivel recorta el mazo antes de repartir, así que las tablas, lo que se
+  // canta y la búsqueda de una carta ven exactamente la misma lista.
+  if (base.hasNivel && meta?.nivel === 'ligero') {
+    return { ...base, cards: base.cards.filter(c => c.nivel === 'ligero') }
+  }
+  return base
+}
+
+/** ¿Esta sala se juega por matrimonios, con tabla compartida? */
+export function isPairsDeck(meta) {
+  return Boolean(resolveDeck(meta)?.pairs)
 }
 
 /**

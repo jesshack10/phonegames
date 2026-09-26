@@ -8,8 +8,8 @@ import {
   SESSION_TTL,
 } from '../../firebase/session.js'
 import { useAuth } from '../../hooks/useAuth.js'
-import { PATTERNS, PATTERN_KEYS, MIN_TEAMS, MAX_TEAMS, TEAMS } from '../../utils/loteria.js'
-import { DECKS, DECK_IDS, DEFAULT_DECK } from '../../data/decks/index.js'
+import { PATTERNS, PATTERN_KEYS, MIN_TEAMS, MAX_TEAMS, TEAMS, TURN_TIMERS, DEFAULT_TIMER } from '../../utils/loteria.js'
+import { DECKS, DECK_IDS, DEFAULT_DECK, NIVELES, DEFAULT_NIVEL } from '../../data/decks/index.js'
 import { parseCustomDeck, CUSTOM_DECK_ID, MIN_CUSTOM_CARDS } from '../../data/decks/custom.js'
 
 const SETTINGS_KEY = 'loteria_settings'
@@ -75,6 +75,8 @@ export default function LoteriaSetup() {
   const [deck, setDeck] = useState(DEFAULT_DECK)
   const [customText, setCustomText] = useState('')
   const [mode, setMode] = useState('individual')
+  const [nivel, setNivel] = useState(DEFAULT_NIVEL)
+  const [timer, setTimer] = useState(DEFAULT_TIMER)
   const [teamCount, setTeamCount] = useState(2)
   const [teamAssign, setTeamAssign] = useState('random')
   const [teamWin, setTeamWin] = useState('first')
@@ -83,6 +85,13 @@ export default function LoteriaSetup() {
   const [error, setError] = useState('')
 
   const codeReady = code.length === 6
+  // La baraja de matrimonios no se juega uno contra uno: cada matrimonio
+  // comparte una tabla y la casilla se gana adivinando. Por eso aquí no se
+  // elige modo — se elige qué tan hondo entran las preguntas.
+  const isPairs = Boolean(DECKS[deck]?.pairs)
+  const nivelCount = isPairs
+    ? DECKS[deck].cards.filter(c => nivel !== 'ligero' || c.nivel === 'ligero').length
+    : 0
   // Se recalcula mientras escribe para mostrar cuántas cartas lleva.
   const customCards = deck === CUSTOM_DECK_ID ? parseCustomDeck(customText).cards : []
   const customCount = customCards.length
@@ -92,15 +101,26 @@ export default function LoteriaSetup() {
     const saved = localStorage.getItem(SETTINGS_KEY)
     if (!saved) return
     try {
-      const { patterns: p, deck: d, mode: m, teamCount: tc, teamAssign: ta, teamWin: tw } = JSON.parse(saved)
+      const { patterns: p, deck: d, mode: m, teamCount: tc, teamAssign: ta, teamWin: tw, nivel: nv, timer: tm } = JSON.parse(saved)
       if (m === 'teams' || m === 'individual') setMode(m)
       if (tc >= MIN_TEAMS && tc <= MAX_TEAMS) setTeamCount(tc)
       if (ta === 'random' || ta === 'manual') setTeamAssign(ta)
       if (tw === 'first' || tw === 'all') setTeamWin(tw)
       if (Array.isArray(p) && p.length) setPatterns(p)
       if (d && (DECKS[d] || d === CUSTOM_DECK_ID)) setDeck(d)
+      if (NIVELES[nv]) setNivel(nv)
+      if (TURN_TIMERS.includes(tm)) setTimer(tm)
     } catch {}
   }, [])
+
+  // Con matrimonios la casilla se gana adivinando, no marcando: llenar las 16
+  // pediría acertar dieciséis veces seguidas en las cartas que justo tocaron.
+  // Al elegir esa baraja se pasa a línea, que sí se alcanza en una reunión.
+  function adjustPatterns(deckId) {
+    if (DECKS[deckId]?.pairs && patterns.length === 1 && patterns[0] === 'full') {
+      setPatterns(['line'])
+    }
+  }
 
   function togglePattern(key) {
     setPatterns(prev =>
@@ -130,10 +150,11 @@ export default function LoteriaSetup() {
     setLoading(true)
     setError('')
     try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ patterns, deck, mode, teamCount, teamAssign, teamWin }))
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ patterns, deck, mode, teamCount, teamAssign, teamWin, nivel, timer }))
       const ordered = PATTERN_KEYS.filter(k => patterns.includes(k))
-      const config = { patterns: ordered, deck, mode }
-      if (mode === 'teams') Object.assign(config, { teamCount, teamAssign, teamWin })
+      const config = { patterns: ordered, deck, mode: isPairs ? 'parejas' : mode }
+      if (isPairs) Object.assign(config, { nivel, timer })
+      else if (mode === 'teams') Object.assign(config, { teamCount, teamAssign, teamWin })
       if (deck === CUSTOM_DECK_ID) {
         const { cards, error: parseError } = parseCustomDeck(customText)
         if (parseError) { setError(parseError); return }
@@ -279,7 +300,7 @@ export default function LoteriaSetup() {
             {DECK_IDS.map(id => (
               <button
                 key={id}
-                onClick={() => { setDeck(id); setError('') }}
+                onClick={() => { setDeck(id); setError(''); adjustPatterns(id) }}
                 className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                   deck === id ? 'bg-amber-500 text-white' : 'bg-white/10 text-white/60 active:bg-white/20'
                 }`}
@@ -326,7 +347,11 @@ export default function LoteriaSetup() {
         {/* Patrones ganadores */}
         <div className="bg-white/5 rounded-2xl px-5 py-4 border border-white/10">
           <p className="text-white font-semibold text-lg mb-1">¿Cómo se gana?</p>
-          <p className="text-white/40 text-xs mb-3">Gana quien complete cualquiera de los elegidos</p>
+          <p className="text-white/40 text-xs mb-3">
+            {isPairs
+              ? 'Aquí la casilla se gana adivinando, así que la tabla llena casi nunca sale. Línea o esquinas se alcanzan en una reunión.'
+              : 'Gana quien complete cualquiera de los elegidos'}
+          </p>
           <div className="flex flex-wrap gap-2">
             {PATTERN_KEYS.map(key => (
               <button
@@ -344,7 +369,61 @@ export default function LoteriaSetup() {
           </div>
         </div>
 
-        {/* Individual o por equipos */}
+        {/* Matrimonios: nivel y reloj. El modo no se elige, lo fija la baraja. */}
+        {isPairs ? (
+          <div className="bg-white/5 rounded-2xl px-5 py-4 border border-white/10 flex flex-col gap-4">
+            <div>
+              <p className="text-white font-semibold text-lg mb-1">¿Cómo se juega?</p>
+              <p className="text-white/40 text-xs leading-snug">
+                Cada matrimonio comparte una tabla. Al cantar una carta, a uno le toca escribir
+                su respuesta en secreto y al otro decir en voz alta qué cree que escribió.
+                La casilla sólo se marca si le atina.
+              </p>
+            </div>
+
+            <div>
+              <p className="text-white/60 text-sm mb-2">¿Qué tan hondo?</p>
+              <div className="flex gap-2">
+                {Object.values(NIVELES).map(n => (
+                  <button
+                    key={n.id}
+                    onClick={() => setNivel(n.id)}
+                    className={`flex-1 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+                      nivel === n.id ? 'bg-amber-500 text-white' : 'bg-white/10 text-white/60 active:bg-white/20'
+                    }`}
+                  >
+                    {n.emoji} {n.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-white/30 text-xs mt-1.5">
+                {NIVELES[nivel].hint} · {nivelCount} cartas
+              </p>
+            </div>
+
+            <div>
+              <p className="text-white/60 text-sm mb-2">¿Cuánto tiempo por carta?</p>
+              <div className="flex gap-2">
+                {TURN_TIMERS.map(t => (
+                  <button
+                    key={t}
+                    onClick={() => setTimer(t)}
+                    className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${
+                      timer === t ? 'bg-amber-500 text-white' : 'bg-white/10 text-white/60 active:bg-white/20'
+                    }`}
+                  >
+                    {t === 0 ? 'Libre' : `${t}s`}
+                  </button>
+                ))}
+              </div>
+              <p className="text-white/30 text-xs mt-1.5">
+                {timer === 0
+                  ? 'Sin prisa: la carta espera a que todos contesten.'
+                  : 'Cuando se acaba el tiempo ya no se puede contestar esa carta.'}
+              </p>
+            </div>
+          </div>
+        ) : (
         <div className="bg-white/5 rounded-2xl px-5 py-4 border border-white/10">
           <p className="text-white font-semibold text-lg mb-3">¿Cómo se juega?</p>
           <div className="flex gap-2">
@@ -424,6 +503,7 @@ export default function LoteriaSetup() {
             </div>
           )}
         </div>
+        )}
 
         <button
           onClick={() => { setError(''); setStep('create') }}

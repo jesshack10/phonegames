@@ -426,7 +426,13 @@ export function subscribePeticionAssignment(sessionId, uid, cb, onError) {
 // Estructura en Firebase:
 //   meta    { game:'loteria', phase, patterns[], round, winner,
 //             drawn: { 0: id, 1: id… } }  — cartas cantadas, en orden
-//   players { uid: { name, isHost, board[16], marks{} } }
+//   players { uid: { name, isHost, board[16], marks{}, pair } }
+//
+// En la baraja de matrimonios el jugador es la pareja, no la persona, así que
+// su tabla y sus marcas no caben en players/{uid}: viven en
+//   meta.parejas/{parejaId} { board[16], marks{}, names }
+//   meta.turnos/{parejaId}  { index, card, answer, phase, ok }
+// El turno es el intercambio de una carta: uno escribe, el otro adivina.
 //
 // Todo cuelga de meta y players a propósito: son los únicos nodos que esta
 // base concede. Un nodo propio para el mazo o las cantadas se rechazaba.
@@ -450,6 +456,8 @@ export async function createLoteriaSession(hostId, config) {
         // leer, y así llega a todos los jugadores con la sala.
         customCards: config.customCards ?? null,
         mode: config.mode ?? 'individual',
+        nivel: config.nivel ?? null,
+        timer: config.timer ?? 0,
         teamCount: config.teamCount ?? null,
         teamAssign: config.teamAssign ?? null,
         teamWin: config.teamWin ?? null,
@@ -470,6 +478,7 @@ export async function joinLoteriaPlayer(sessionId, uid, name, isHost = false) {
     isHost,
     board: null,
     marks: null,
+    pair: null,
   })
 }
 
@@ -536,7 +545,7 @@ async function stage(label, run) {
   }
 }
 
-export async function startLoteriaRound(sessionId, boards, round, metaPatch = {}, teams = null) {
+export async function startLoteriaRound(sessionId, boards, round, metaPatch = {}, teams = null, parejas = null) {
   // Everything lives under players/ and meta/, the only nodes this database
   // grants. An earlier design kept the deck and the called cards in their own
   // top-level nodes; reads of those were refused, so a called card was written
@@ -552,11 +561,24 @@ export async function startLoteriaRound(sessionId, boards, round, metaPatch = {}
     )
   }
 
+  // Una tabla por matrimonio, no por persona: los dos celulares leen la misma
+  // y marcan en la misma. Va antes del cambio de fase, igual que las tablas
+  // individuales, para que nadie entre a jugar sin tabla.
+  if (parejas) {
+    for (const [pairId, data] of Object.entries(parejas)) {
+      await stage('tablas de las parejas', () =>
+        set(ref(db, `sessions/${sessionId}/meta/parejas/${pairId}`), { ...data, marks: null })
+      )
+    }
+  }
+
   await stage('estado de la ronda', () =>
     update(ref(db, `sessions/${sessionId}/meta`), {
       phase: 'active',
       round,
       drawn: null,
+      drawnAt: null,
+      turnos: null,
       winners: null,
       wonAtDrawn: null,
       ...metaPatch,
@@ -568,6 +590,12 @@ export async function startLoteriaRound(sessionId, boards, round, metaPatch = {}
 export async function drawLoteriaCard(sessionId, index, cardId) {
   await stage('la carta cantada', () =>
     set(ref(db, `sessions/${sessionId}/meta/drawn/${index}`), cardId)
+  )
+  // El cronómetro cuenta desde aquí. Va en un solo número compartido para que
+  // todos los teléfonos cuenten lo mismo en vez de cada uno desde que se
+  // enteró — con eso una conexión lenta no regala segundos.
+  await stage('el reloj de la carta', () =>
+    set(ref(db, `sessions/${sessionId}/meta/drawnAt`), Date.now())
   )
 }
 
@@ -593,8 +621,12 @@ export async function claimLoteriaWin(sessionId, claim, drawnCount) {
   let accepted = false
   await stage('el cierre de la ronda', async () => {
     await runTransaction(gate, (existing) => {
+      // Cada rama fija accepted, incluida la que rechaza: la transacción puede
+      // reintentarse con otro valor y un `accepted` heredado del intento
+      // anterior daría por bueno un reclamo que llegó tarde.
       if (existing == null) { accepted = true; return drawnCount }
       if (existing === drawnCount) { accepted = true; return existing }
+      accepted = false
       return existing
     })
   })
@@ -619,6 +651,79 @@ export async function setPlayerTeam(sessionId, uid, team) {
   await stage('el equipo', () =>
     update(ref(db, `sessions/${sessionId}/players/${uid}`), { team })
   )
+}
+
+/**
+ * A quién escogió como su pareja. Queda confirmado sólo cuando el otro también
+ * lo escoge; hasta entonces es una invitación, no un matrimonio.
+ */
+export async function setLoteriaPair(sessionId, uid, otherUid) {
+  await stage('la pareja', () =>
+    set(ref(db, `sessions/${sessionId}/players/${uid}/pair`), otherUid ?? null)
+  )
+}
+
+/**
+ * Suma puntos al marcador. Va por transacción porque aquí hay varios
+ * escritores a la vez: cada pareja apunta sus propios aciertos mientras el
+ * moderador apunta el punto de la ronda, y un leer-y-escribir normal perdería
+ * los que caigan en medio.
+ */
+export async function addLoteriaPoint(sessionId, key, n = 1) {
+  await stage('el marcador', () =>
+    runTransaction(ref(db, `sessions/${sessionId}/meta/scores/${key}`), (v) => (v ?? 0) + n)
+  )
+}
+
+/** Marca una casilla de la tabla compartida del matrimonio. */
+export async function setCoupleMark(sessionId, pairId, index) {
+  await stage('la casilla', () =>
+    set(ref(db, `sessions/${sessionId}/meta/parejas/${pairId}/marks/${index}`), true)
+  )
+}
+
+/**
+ * Guarda el turno de una pareja en la carta que se está cantando.
+ *
+ * El turno pasa por: escribir (uno contesta en secreto) → adivinar (el otro lo
+ * dice en voz alta) → revelado (los dos ven lo que se escribió) → listo (quien
+ * escribió dice si le atinó). Se reemplaza entero al empezar una carta nueva,
+ * para que no quede la respuesta de la anterior colgando.
+ */
+export async function setLoteriaTurn(sessionId, pairId, turn) {
+  await stage('el turno', () =>
+    set(ref(db, `sessions/${sessionId}/meta/turnos/${pairId}`), turn)
+  )
+}
+
+/** Avanza el turno en curso sin reescribir lo que ya se contestó. */
+export async function patchLoteriaTurn(sessionId, pairId, patch) {
+  await stage('el turno', () =>
+    update(ref(db, `sessions/${sessionId}/meta/turnos/${pairId}`), patch)
+  )
+}
+
+/**
+ * Cierra el turno de una pareja con su resultado.
+ *
+ * Va por transacción porque los dos celulares del matrimonio pueden cerrarlo
+ * (en un reto cualquiera de los dos toca "ya lo hicimos"), y el punto del
+ * acierto se suma una sola vez: sólo quien recibe accepted lo apunta.
+ */
+export async function finishLoteriaTurn(sessionId, pairId, turn) {
+  const r = ref(db, `sessions/${sessionId}/meta/turnos/${pairId}`)
+  let accepted = false
+  await stage('el resultado del turno', async () => {
+    await runTransaction(r, (existing) => {
+      if (existing?.index === turn.index && existing?.phase === 'done') {
+        accepted = false
+        return existing
+      }
+      accepted = true
+      return { ...(existing?.index === turn.index ? existing : {}), ...turn, phase: 'done' }
+    })
+  })
+  return { accepted }
 }
 
 export async function updateLoteriaMeta(sessionId, updates) {

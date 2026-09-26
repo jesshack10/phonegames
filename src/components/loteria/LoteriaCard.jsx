@@ -7,7 +7,7 @@ import { findCard } from '../../utils/loteria.js'
  *   'md' — casilla de la tabla del jugador
  *   'sm' — miniatura del historial de cantadas
  */
-export function LoteriaCard({ id, deck, size = 'md', marked = false, dimmed = false, onClick }) {
+export function LoteriaCard({ id, deck, size = 'md', marked = false, dimmed = false, highlight = false, onClick }) {
   const card = findCard(deck, id)
   if (!card) return null
 
@@ -31,6 +31,7 @@ export function LoteriaCard({ id, deck, size = 'md', marked = false, dimmed = fa
       className={`relative w-full aspect-[3/4] flex flex-col items-center justify-center text-center overflow-hidden
         bg-gradient-to-br ${cardGradient(card.id)} ${S.box}
         ${marked ? 'ring-[3px] ring-inset ring-red-400' : ''}
+        ${highlight && !marked ? 'ring-[3px] ring-amber-300 animate-pulse' : ''}
         ${dimmed ? 'opacity-40' : ''}
         ${onClick ? 'active:scale-95 transition-transform' : ''}`}
     >
